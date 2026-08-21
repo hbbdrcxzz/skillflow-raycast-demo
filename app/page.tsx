@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { WorkflowPlan } from "@/lib/contracts";
 
 type Stage = "home" | "diagnose" | "routes" | "lens" | "dashboard";
 
@@ -44,6 +45,9 @@ export default function Home() {
   const [diffOpen, setDiffOpen] = useState(false);
   const [diffApplied, setDiffApplied] = useState(false);
   const [toast, setToast] = useState("");
+  const [workflowPlan, setWorkflowPlan] = useState<WorkflowPlan | null>(null);
+  const [compileState, setCompileState] = useState<"idle" | "compiling" | "ready" | "error">("idle");
+  const [selectedNodeId, setSelectedNodeId] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -90,6 +94,7 @@ export default function Home() {
     setAnswers([]);
     setSelectedOption("");
     setStage(target);
+    if (target === "routes") void compileCurrentPlan([]);
   }
 
   function confirmAnswer() {
@@ -98,9 +103,38 @@ export default function Home() {
     setAnswers(nextAnswers);
     setSelectedOption("");
     if (questionIndex === questions.length - 1) {
-      window.setTimeout(() => setStage("routes"), 180);
+      window.setTimeout(() => {
+        setStage("routes");
+        void compileCurrentPlan(nextAnswers);
+      }, 180);
     } else {
       setQuestionIndex((value) => value + 1);
+    }
+  }
+
+  async function compileCurrentPlan(answerSet: string[]) {
+    setCompileState("compiling");
+    try {
+      const response = await fetch("/api/workflows/diagnose", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          goal: task,
+          sources: answerSet[0] ? answerSet[0].split(" + ") : ["飞书文档", "Excel"],
+          audience: answerSet[1] || "管理层",
+          frequency: answerSet[2] || "每周",
+          targetUser: "互联网产品 / 运营",
+        }),
+      });
+      const payload = (await response.json()) as { plan?: WorkflowPlan; error?: string };
+      if (!response.ok || !payload.plan) throw new Error(payload.error || "生成失败");
+      setWorkflowPlan(payload.plan);
+      setSelectedRoute(payload.plan.recommendation === "single_skill" ? 0 : 1);
+      setSelectedNodeId(payload.plan.nodes[0]?.id || "");
+      setCompileState("ready");
+    } catch {
+      setCompileState("error");
+      setToast("计划生成失败，已保留当前页面，可稍后重试");
     }
   }
 
@@ -109,6 +143,8 @@ export default function Home() {
     setDiffOpen(false);
     setToast("已生成个人版本 v2，可随时撤销");
   }
+
+  const selectedNode = workflowPlan?.nodes.find((node) => node.id === selectedNodeId) || workflowPlan?.nodes[0];
 
   return (
     <main className={`site stage-${stage}`}>
@@ -248,8 +284,11 @@ export default function Home() {
             {stage === "routes" && (
               <div className="routes-layout stage-enter">
                 <div className="routes-head">
-                  <div><div className="micro-label">AI 推荐 · 2 条可运行路径</div><h2>先验证高频收益，再沉淀完整流程。</h2></div>
-                  <button className="ghost" onClick={() => { setStage("diagnose"); setQuestionIndex(0); setAnswers([]); }}>调整上下文</button>
+                  <div><div className="micro-label">AI 编译 · 2 条能力路径草案</div><h2>先验证高频收益，再沉淀完整流程。</h2></div>
+                  <div className="routes-head-actions">
+                    <span className={`compile-state ${compileState}`}><i />{compileState === "compiling" ? "正在编译任务" : compileState === "ready" ? "结构校验通过" : compileState === "error" ? "需要重试" : "等待任务"}</span>
+                    <button className="ghost" onClick={() => { setStage("diagnose"); setQuestionIndex(0); setAnswers([]); }}>调整上下文</button>
+                  </div>
                 </div>
 
                 <div className="route-canvas">
@@ -263,20 +302,54 @@ export default function Home() {
                     <span className="route-tag">01 · 快速收益</span>
                     <span className="route-node source"><small>输入</small><strong>飞书 + Excel</strong><em>已准备</em></span>
                     <span className="route-beam"><i /></span>
-                    <span className="route-node skill"><small>推荐 Skill · 92%</small><strong>管理层周报生成器</strong><em>可运行</em></span>
+                    <span className="route-node skill"><small>契约匹配 · E0</small><strong>管理层周报生成器</strong><em>待样例评测</em></span>
                     <span className="route-beam"><i /></span>
-                    <span className="route-node output"><small>结果</small><strong>管理层周报</strong><em>每周约省 2.1h</em></span>
+                    <span className="route-node output"><small>结果</small><strong>管理层周报</strong><em>预期收益 · 待实测</em></span>
                   </button>
 
                   <button className={`route-line complete ${selectedRoute === 1 ? "selected" : ""}`} onClick={() => setSelectedRoute(1)}>
                     <span className="route-tag">02 · 完整流程</span>
                     <span className="route-node source"><small>输入</small><strong>访谈记录</strong><em>文本 / 录音</em></span>
                     <span className="route-beam"><i /></span>
-                    <span className="route-node chain"><small>4 个 Skill</small><strong>{routeNodes.join(" → ")}</strong><em>每次约省 7.6h</em></span>
+                    <span className="route-node chain"><small>4 个 Skill</small><strong>{routeNodes.join(" → ")}</strong><em>端到端收益 · 待实测</em></span>
                     <span className="route-beam"><i /></span>
                     <span className="route-node output"><small>结果</small><strong>可评审 PRD</strong><em>沉淀为工作流</em></span>
                   </button>
                 </div>
+
+                {workflowPlan && selectedNode && (
+                  <section className="node-audit" aria-label="节点 AI 决策与 Skill 证据">
+                    <div className="node-rail">
+                      <div className="node-rail-head"><span>节点审计</span><small>{workflowPlan.recommendation === "single_skill" ? "一个 Skill 足够" : `${workflowPlan.nodes.length} 个受控节点`}</small></div>
+                      <div className="node-tabs">
+                        {workflowPlan.nodes.map((node, index) => (
+                          <button key={node.id} className={selectedNode.id === node.id ? "active" : ""} onClick={() => setSelectedNodeId(node.id)}>
+                            <span>{String(index + 1).padStart(2, "0")}</span><b>{node.label}</b><i className={`risk-${node.autonomyRisk}`} />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="node-verdict">
+                      <div className="verdict-kicker"><span>{selectedNode.kind.replaceAll("_", " ")}</span><em>AI 适配度 {selectedNode.aiFit}/100</em></div>
+                      <h3>{selectedNode.label}</h3>
+                      <p>{selectedNode.aiVerdict}</p>
+                      <div className="responsibility-line"><span>人负责</span><strong>{selectedNode.humanResponsibility}</strong></div>
+                      <div className="contract-pills">
+                        <span>输入 · {selectedNode.inputs.join(" / ")}</span>
+                        <span>输出 · {selectedNode.outputs.join(" / ")}</span>
+                      </div>
+                    </div>
+                    <aside className="skill-evidence">
+                      <div className="skill-evidence-head"><span>{selectedNode.skillName ? "绑定 SkillRelease" : "节点实现"}</span><em>{selectedNode.evidenceLevel || "规则"}</em></div>
+                      <h4>{selectedNode.skillName || (selectedNode.kind.includes("connector") ? "受控 Connector" : selectedNode.executionMode === "human_only" ? "人类决策" : "确定性内建节点")}</h4>
+                      {selectedNode.score ? <div className="evidence-score"><strong>{selectedNode.score}</strong><span>/ 100<small>证据评分，不是模型自报</small></span></div> : <div className="evidence-note">此节点不需要用大模型包装。</div>}
+                      <ul>
+                        {selectedNode.acceptance.slice(0, 3).map((item) => <li key={item.id}>✓ {item.label}</li>)}
+                        {selectedNode.permissions.slice(0, 2).map((item) => <li key={item.capability}>⌁ {item.capability} · {item.resourceScope}</li>)}
+                      </ul>
+                    </aside>
+                  </section>
+                )}
 
                 <div className="route-detail">
                   <div className="detail-copy">
@@ -289,7 +362,7 @@ export default function Home() {
                   </div>
                   <div className="route-actions">
                     <button className="ghost" onClick={() => setToast("已保存为候选组合")}>保存组合</button>
-                    <button className="primary" onClick={() => setStage("lens")}>预览真实结果 <span>↗</span></button>
+                    <button className="primary" onClick={() => setStage("lens")}>查看官方样例 <span>↗</span></button>
                   </div>
                 </div>
               </div>
@@ -299,7 +372,7 @@ export default function Home() {
               <div className="lens-layout stage-enter">
                 <div className="lens-stage">
                   <div className="lens-toolbar">
-                    <div><button onClick={() => setStage("routes")}>←</button><span>Outcome Lens</span><i>官方样例 · 已运行</i></div>
+                    <div><button onClick={() => setStage("routes")}>←</button><span>Outcome Lens</span><i>官方样例 · 预制结果</i></div>
                     <div><button className="active">对比</button><button>结果</button><button>处理过程</button></div>
                   </div>
 
@@ -339,7 +412,7 @@ export default function Home() {
                 </div>
 
                 <aside className="lens-inspector">
-                  <div className="inspector-head"><span className="skill-glyph mint">WR</span><div><small>推荐 Skill · 92%</small><strong>管理层周报生成器</strong></div></div>
+                  <div className="inspector-head"><span className="skill-glyph mint">WR</span><div><small>候选 Skill · E0 待评测</small><strong>管理层周报生成器</strong></div></div>
                   <div className="reason-list"><div><i>✓</i><span><b>输入稳定</b><small>仅读取指定文档与表格</small></span></div><div><i>✓</i><span><b>结果可检查</b><small>输出为可编辑飞书文档</small></span></div><div><i className="amber">!</i><span><b>发送需确认</b><small>不会自动发给管理层</small></span></div></div>
                   <div className="adjust-box">
                     <label htmlFor="adjustment">告诉 AI 你想怎么调整</label>

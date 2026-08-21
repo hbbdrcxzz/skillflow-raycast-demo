@@ -1,0 +1,79 @@
+{
+  "manifest_version": "1.0.0",
+  "skill": {
+    "id": "skl_product_deliverable_quality_reviewer",
+    "slug": "deliverable-quality-reviewer",
+    "name_zh": "产品交付物质量审查",
+    "summary_zh": "按照证据、结构、边界和可执行性标准检查洞察、周报或 PRD，并输出可定位的问题清单。",
+    "domain": "internet-product-operations",
+    "status": "draft",
+    "source_type": "platform-example",
+    "source_status": "example-only",
+    "author": {"display_name": "Skillflow 产品示例（占位）", "status": "example-placeholder", "source_url": null},
+    "tags": ["质量审查", "证据", "PRD", "周报", "验证"]
+  },
+  "task": {
+    "definition_zh": "根据选定交付物类型的审查规则，定位缺证据、过度确定、结构缺失、不可验收和内部矛盾。",
+    "jobs_to_be_done_zh": "当 AI 已生成产品交付物时，希望在人工评审前先得到一份不替代负责人判断的质量报告。",
+    "applies_when_zh": ["交付物有明确类型和预期结构", "可提供证据索引或明确说明无证据", "用户需要问题定位而不是自动篡改正文"],
+    "not_for_zh": ["证明所有事实真实", "替代法律、合规或安全评审", "在没有规则时输出笼统好坏评价", "自动发布审查通过的内容"],
+    "success_criteria_zh": ["问题定位到字段或段落", "区分阻断、重要和建议级问题", "每个问题包含原因和修复建议", "不把风格偏好当成事实错误"],
+    "assumptions_zh": ["交付物可被解析为结构化内容或带段落定位的文本"]
+  },
+  "node": {"type": "validation", "cognitive_fit": "high", "autonomy_risk": "medium", "recommended_execution_mode": "ai-with-exception", "human_gate_zh": "审查结果只作为人工评审输入；是否通过由交付物负责人决定。"},
+  "contracts": {
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deliverable_type", "deliverable", "review_profile"],
+      "properties": {
+        "deliverable_type": {"type": "string", "enum": ["insight-report", "prd", "product-weekly-report", "requirement-ranking"]},
+        "deliverable": {"type": "object"},
+        "evidence_index": {"type": "array", "items": {"type": "object"}},
+        "review_profile": {"type": "string", "enum": ["standard", "evidence-strict", "executive-brief"]}
+      }
+    },
+    "output_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "issues", "checks"],
+      "properties": {
+        "decision": {"type": "string", "enum": ["pass-with-notes", "needs-revision", "blocked"]},
+        "issues": {"type": "array", "items": {"type": "object", "required": ["issue_id", "severity", "location", "reason", "suggested_fix"], "properties": {"issue_id": {"type": "string"}, "severity": {"type": "string", "enum": ["blocker", "important", "suggestion"]}, "location": {"type": "string"}, "reason": {"type": "string"}, "suggested_fix": {"type": "string"}}}},
+        "checks": {"type": "array", "items": {"type": "object", "required": ["check", "status"], "properties": {"check": {"type": "string"}, "status": {"type": "string", "enum": ["pass", "fail", "not-applicable"]}}}}
+      }
+    }
+  },
+  "permissions": {"risk_level": "low", "read": ["本次待审交付物和可选证据索引"], "write": ["本次运行的质量报告"], "network": {"mode": "none", "allowlist": []}, "credentials": [], "external_actions": [], "requires_per_run_confirmation": false},
+  "connectors": {"required": [], "optional": []},
+  "region_data_policy": {
+    "default_processing_region": "CN",
+    "allowed_processing_regions": ["CN"],
+    "foreign_model_policy": {"allowed": true, "requires_explicit_consent": true, "disclosure_zh": "使用境外模型时须告知待审交付物与证据摘要的发送范围。"},
+    "data_classes_allowed": ["一般内部产品资料", "匿名化研究摘要"],
+    "data_classes_blocked": ["国家秘密", "密钥", "未获授权的敏感个人信息"],
+    "retention": {"unsaved_input_hours": 24, "temporary_output_hours": 24, "saved_asset_policy_zh": "保存后随工作流运行记录保留至用户删除。"},
+    "training_policy_zh": "用户材料不得用于公共模型训练。"
+  },
+  "execution": {"class": "instruction-only", "runtime": "skillflow-cn-sandbox", "timeout_seconds": 240, "max_retries": 1, "sandbox_required": true, "side_effects": ["生成质量问题清单，不自动修改原文"], "human_gate": "recommended"},
+  "evidence": {"current_level": "E0", "target_level_before_recommendation": "E2", "claims_zh": ["当前为平台示例，尚未建立不同交付物类型的正式审查基准。"], "records": []},
+  "license": {"declared_license": null, "source_status": "example-placeholder", "internal_tier": "L0_EXAMPLE_ONLY", "commercial_use_status": "blocked-until-verified", "notice_zh": "平台示例清单；作者与许可证待确认。"},
+  "versioning": {"current_version": "0.1.0", "versions": [{"version": "0.1.0", "status": "draft", "content_hash": null, "breaking_change": false, "changes_zh": ["建立交付物质量审查契约"]}]},
+  "evaluations": {
+    "cases": [
+      {"id": "eval_review_missing_evidence", "name_zh": "识别缺少证据与开放问题", "status": "planned", "fixture_zh": "一份含三个无来源结论和缺失验收标准的 PRD", "assertions_zh": ["无来源结论被定位", "不可验收需求标为 important 或 blocker", "不自动改写原文"], "required_evidence_level": "E2", "last_result": null},
+      {"id": "eval_review_style_vs_fact", "name_zh": "区分风格建议和事实错误", "status": "planned", "fixture_zh": "事实与证据完整但篇幅较长的周报", "assertions_zh": ["不把篇幅偏好标为事实错误", "风格问题仅为 suggestion"], "required_evidence_level": "E2", "last_result": null}
+    ]
+  },
+  "failure_policy": {"known_failures_zh": ["审查规则与交付物类型不匹配", "把写作偏好误判为错误", "无法定位非结构化文档段落"], "retry_on_zh": ["输出未通过 Schema"], "stop_on_zh": ["缺少 deliverable_type", "交付物为空"], "fallback_zh": ["仅执行结构和证据存在性检查", "把无法定位的问题交给人工"], "allow_partial_result": true},
+  "personalization": {
+    "mode": "overlay",
+    "fields": [
+      {"key": "review_profile", "label_zh": "审查标准", "type": "string", "default": "standard", "allowed_values": ["standard", "evidence-strict", "executive-brief"], "affects": ["问题阈值"], "requires_new_skill_version": false},
+      {"key": "blocker_rules", "label_zh": "阻断条件", "type": "array", "default": ["关键结论无证据", "核心需求无验收标准", "存在内部矛盾"], "affects": ["审查结论"], "requires_new_skill_version": false},
+      {"key": "auto_fix", "label_zh": "自动修复", "type": "boolean", "default": false, "affects": ["仅建议，不修改原文"], "requires_new_skill_version": false}
+    ]
+  }
+}

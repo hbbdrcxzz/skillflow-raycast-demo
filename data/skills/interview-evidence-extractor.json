@@ -1,0 +1,134 @@
+{
+  "manifest_version": "1.0.0",
+  "skill": {
+    "id": "skl_product_interview_evidence_extractor",
+    "slug": "interview-evidence-extractor",
+    "name_zh": "访谈证据抽取",
+    "summary_zh": "从标准化访谈中抽取需求、行为、痛点、动机和反例，并把每条判断绑定到原始材料位置。",
+    "domain": "internet-product-operations",
+    "status": "draft",
+    "source_type": "platform-example",
+    "source_status": "example-only",
+    "author": {"display_name": "Skillflow 产品示例（占位）", "status": "example-placeholder", "source_url": null},
+    "tags": ["用户访谈", "证据抽取", "原话", "痛点", "行为"]
+  },
+  "task": {
+    "definition_zh": "逐段识别与研究目标相关的用户事实和原话，区分观察事实、用户表达与分析解释。",
+    "jobs_to_be_done_zh": "当产品经理面对长篇访谈时，希望快速得到可回溯的证据卡，而不是脱离原文的摘要。",
+    "applies_when_zh": ["输入已被分段并带来源定位", "研究目标或问题已给出", "需要保留支持与反对证据"],
+    "not_for_zh": ["直接给出产品优先级", "把单个受访者观点推广为全部用户", "补充访谈中没有出现的事实", "替代高风险研究结论的人工复核"],
+    "success_criteria_zh": ["每条证据绑定 segment_id 和原文定位", "区分原话、事实描述和分析解释", "输出支持证据与反例", "低置信度条目标记待复核"],
+    "assumptions_zh": ["输入材料已经完成质量检查", "研究目标足够具体"]
+  },
+  "node": {
+    "type": "ai-cognitive",
+    "cognitive_fit": "high",
+    "autonomy_risk": "medium",
+    "recommended_execution_mode": "ai-with-exception",
+    "human_gate_zh": "低置信度、证据冲突或涉及敏感推断时进入人工复核。"
+  },
+  "contracts": {
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["research_goal", "normalized_segments"],
+      "properties": {
+        "research_goal": {"type": "string"},
+        "research_questions": {"type": "array", "items": {"type": "string"}},
+        "normalized_segments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["segment_id", "source_id", "text", "locator"],
+            "properties": {
+              "segment_id": {"type": "string"},
+              "source_id": {"type": "string"},
+              "speaker_id": {"type": ["string", "null"]},
+              "text": {"type": "string"},
+              "locator": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "output_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_items", "review_queue"],
+      "properties": {
+        "evidence_items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["evidence_id", "segment_id", "category", "quote", "interpretation", "confidence"],
+            "properties": {
+              "evidence_id": {"type": "string"},
+              "segment_id": {"type": "string"},
+              "category": {"type": "string", "enum": ["need", "behavior", "pain-point", "motivation", "workaround", "expectation", "objection", "counterexample"]},
+              "quote": {"type": "string"},
+              "interpretation": {"type": "string"},
+              "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+              "sensitive_inference": {"type": "boolean"}
+            }
+          }
+        },
+        "review_queue": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  },
+  "permissions": {
+    "risk_level": "medium",
+    "read": ["标准化访谈文本及来源定位"],
+    "write": ["本次运行的证据卡和复核队列"],
+    "network": {"mode": "none", "allowlist": []},
+    "credentials": [],
+    "external_actions": [],
+    "requires_per_run_confirmation": false
+  },
+  "connectors": {"required": [], "optional": []},
+  "region_data_policy": {
+    "default_processing_region": "CN",
+    "allowed_processing_regions": ["CN"],
+    "foreign_model_policy": {"allowed": true, "requires_explicit_consent": true, "disclosure_zh": "若用户选择境外模型，必须告知访谈文本将被发送的范围和接收方。"},
+    "data_classes_allowed": ["一般内部资料", "经授权的访谈个人信息"],
+    "data_classes_blocked": ["国家秘密", "未获授权的敏感个人信息"],
+    "retention": {"unsaved_input_hours": 24, "temporary_output_hours": 24, "saved_asset_policy_zh": "保存的证据卡随项目保留至用户删除。"},
+    "training_policy_zh": "用户材料不得用于公共模型训练。"
+  },
+  "execution": {
+    "class": "instruction-only",
+    "runtime": "skillflow-cn-sandbox",
+    "timeout_seconds": 300,
+    "max_retries": 1,
+    "sandbox_required": true,
+    "side_effects": ["生成结构化证据卡"],
+    "human_gate": "conditional"
+  },
+  "evidence": {"current_level": "E0", "target_level_before_recommendation": "E2", "claims_zh": ["当前为平台能力规划，尚无沙箱成功率或独立评测。"], "records": []},
+  "license": {"declared_license": null, "source_status": "example-placeholder", "internal_tier": "L0_EXAMPLE_ONLY", "commercial_use_status": "blocked-until-verified", "notice_zh": "平台示例清单；作者、来源与许可证均未作为外部开源事实声明。"},
+  "versioning": {"current_version": "0.1.0", "versions": [{"version": "0.1.0", "status": "draft", "content_hash": null, "breaking_change": false, "changes_zh": ["建立首版证据抽取契约"]}]},
+  "evaluations": {
+    "cases": [
+      {"id": "eval_extract_traceable_evidence", "name_zh": "原话与解释分离", "status": "planned", "fixture_zh": "三位受访者关于协作通知的标准化访谈", "assertions_zh": ["每条证据可回溯到 segment_id", "原话不被改写为不存在的事实", "同时保留反例"], "required_evidence_level": "E2", "last_result": null},
+      {"id": "eval_sensitive_inference", "name_zh": "阻止敏感属性推断", "status": "planned", "fixture_zh": "包含健康和收入暗示但无明确陈述的访谈片段", "assertions_zh": ["不擅自推断敏感属性", "相关条目进入复核队列"], "required_evidence_level": "E2", "last_result": null}
+    ]
+  },
+  "failure_policy": {
+    "known_failures_zh": ["研究目标过宽", "原文定位丢失", "引用跨段拼接导致含义变化", "模型将解释写成事实"],
+    "retry_on_zh": ["结构化输出未通过 Schema"],
+    "stop_on_zh": ["输入没有来源定位", "材料被策略阻断"],
+    "fallback_zh": ["仅输出可确认原话并把其余内容转人工", "要求用户缩小研究问题"],
+    "allow_partial_result": true
+  },
+  "personalization": {
+    "mode": "overlay",
+    "fields": [
+      {"key": "evidence_categories", "label_zh": "证据类别", "type": "array", "default": ["need", "behavior", "pain-point", "workaround", "counterexample"], "affects": ["抽取范围"], "requires_new_skill_version": false},
+      {"key": "review_threshold", "label_zh": "人工复核阈值", "type": "number", "default": 0.7, "affects": ["复核队列"], "requires_new_skill_version": false},
+      {"key": "quote_length", "label_zh": "原话长度", "type": "string", "default": "最小充分", "allowed_values": ["短句", "最小充分", "完整问答"], "affects": ["引用展示"], "requires_new_skill_version": false}
+    ]
+  }
+}

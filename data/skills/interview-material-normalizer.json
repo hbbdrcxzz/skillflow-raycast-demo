@@ -1,0 +1,164 @@
+{
+  "manifest_version": "1.0.0",
+  "skill": {
+    "id": "skl_product_interview_material_normalizer",
+    "slug": "interview-material-normalizer",
+    "name_zh": "访谈材料标准化",
+    "summary_zh": "把文本、文档、表格和音视频转写结果整理为可追溯、可被后续分析引用的统一访谈材料。",
+    "domain": "internet-product-operations",
+    "status": "draft",
+    "source_type": "platform-example",
+    "source_status": "example-only",
+    "author": {
+      "display_name": "Skillflow 产品示例（占位）",
+      "status": "example-placeholder",
+      "source_url": null
+    },
+    "tags": ["用户访谈", "材料处理", "转写", "OCR", "证据追溯"]
+  },
+  "task": {
+    "definition_zh": "将多格式访谈材料转换为统一分段结构，并保留来源、说话人、时间戳、页码或行号等证据定位。",
+    "jobs_to_be_done_zh": "当产品经理拿到格式混杂的访谈材料时，希望先得到一份完整、去噪且可追溯的分析底稿。",
+    "applies_when_zh": ["材料来自 TXT、Markdown、Word、PDF、Excel、CSV 或已完成转写的音视频", "后续节点需要按原文定位证据", "一项研究包含一份或多份访谈材料"],
+    "not_for_zh": ["替代用户研究洞察判断", "推测无法辨认的音频内容", "未经授权处理包含国家秘密或被组织策略禁止的数据", "把低质量 OCR 或转写结果伪装为确定原文"],
+    "success_criteria_zh": ["每个分段有稳定 segment_id 与 source_id", "可获得时保留说话人、时间戳、页码或行号", "不可辨认内容以质量标记呈现而非补写", "输出材料覆盖率和缺失情况"],
+    "assumptions_zh": ["音视频已由平台注册的转写服务生成文本，或运行时具备经授权的转写能力", "用户有权处理所上传材料"]
+  },
+  "node": {
+    "type": "deterministic-processing",
+    "cognitive_fit": "medium",
+    "autonomy_risk": "medium",
+    "recommended_execution_mode": "ai-with-exception",
+    "human_gate_zh": "说话人无法区分、OCR 质量低或材料覆盖不足时，要求用户确认后再进入洞察分析。"
+  },
+  "contracts": {
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project_id", "research_goal", "materials"],
+      "properties": {
+        "project_id": {"type": "string"},
+        "research_goal": {"type": "string", "minLength": 1},
+        "materials": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source_id", "source_type", "content_ref"],
+            "properties": {
+              "source_id": {"type": "string"},
+              "source_type": {"type": "string", "enum": ["text", "markdown", "docx", "pdf", "xlsx", "csv", "audio-transcript", "video-transcript"]},
+              "content_ref": {"type": "string"},
+              "participant_label": {"type": ["string", "null"]},
+              "language": {"type": "string", "default": "zh-CN"}
+            }
+          }
+        }
+      }
+    },
+    "output_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project_id", "normalized_segments", "coverage"],
+      "properties": {
+        "project_id": {"type": "string"},
+        "normalized_segments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["segment_id", "source_id", "text", "locator", "quality_flags"],
+            "properties": {
+              "segment_id": {"type": "string"},
+              "source_id": {"type": "string"},
+              "speaker_id": {"type": ["string", "null"]},
+              "text": {"type": "string"},
+              "locator": {"type": "string"},
+              "quality_flags": {"type": "array", "items": {"type": "string"}}
+            }
+          }
+        },
+        "coverage": {
+          "type": "object",
+          "required": ["source_count", "processed_count", "warnings"],
+          "properties": {
+            "source_count": {"type": "integer", "minimum": 1},
+            "processed_count": {"type": "integer", "minimum": 0},
+            "warnings": {"type": "array", "items": {"type": "string"}}
+          }
+        }
+      }
+    }
+  },
+  "permissions": {
+    "risk_level": "medium",
+    "read": ["用户本次明确选择的访谈材料"],
+    "write": ["本次运行的临时标准化结果"],
+    "network": {"mode": "connector-only", "allowlist": []},
+    "credentials": [],
+    "external_actions": [],
+    "requires_per_run_confirmation": false
+  },
+  "connectors": {
+    "required": [{"connector_id": "source-upload", "mode": "read", "purpose_zh": "读取用户本次上传或粘贴的材料"}],
+    "optional": [{"connector_id": "feishu-docs", "mode": "read", "purpose_zh": "从用户授权的飞书文档读取访谈材料"}]
+  },
+  "region_data_policy": {
+    "default_processing_region": "CN",
+    "allowed_processing_regions": ["CN"],
+    "foreign_model_policy": {"allowed": true, "requires_explicit_consent": true, "disclosure_zh": "默认使用中国区可用能力；若转写或解析需要境外模型，必须在运行前说明发送字段、接收方和保存策略。"},
+    "data_classes_allowed": ["公开资料", "一般内部资料", "经授权的访谈个人信息"],
+    "data_classes_blocked": ["国家秘密", "未获授权的敏感个人信息", "组织策略明确禁止上传的数据"],
+    "retention": {"unsaved_input_hours": 24, "temporary_output_hours": 24, "saved_asset_policy_zh": "用户保存后保留至用户主动删除。"},
+    "training_policy_zh": "用户材料不得用于公共模型训练。"
+  },
+  "execution": {
+    "class": "built-in",
+    "runtime": "skillflow-cn-sandbox",
+    "timeout_seconds": 600,
+    "max_retries": 2,
+    "sandbox_required": true,
+    "side_effects": ["生成临时标准化文本和质量报告"],
+    "human_gate": "conditional"
+  },
+  "evidence": {
+    "current_level": "E0",
+    "target_level_before_recommendation": "E2",
+    "claims_zh": ["当前为平台能力规划，尚未完成沙箱与多格式回归测试。"],
+    "records": []
+  },
+  "license": {
+    "declared_license": null,
+    "source_status": "example-placeholder",
+    "internal_tier": "L0_EXAMPLE_ONLY",
+    "commercial_use_status": "blocked-until-verified",
+    "notice_zh": "这是 Skillflow Phase 1 示例清单，不代表已导入任何外部开源 Skill；作者与许可证待项目主体确认。"
+  },
+  "versioning": {
+    "current_version": "0.1.0",
+    "versions": [{"version": "0.1.0", "status": "draft", "content_hash": null, "breaking_change": false, "changes_zh": ["建立首版任务、Schema、权限和评测计划"]}]
+  },
+  "evaluations": {
+    "cases": [
+      {"id": "eval_normalize_mixed_sources", "name_zh": "多格式访谈材料标准化", "status": "planned", "fixture_zh": "一份 DOCX、一份 CSV 和一份带时间戳的音频转写", "assertions_zh": ["所有来源均有 segment_id", "来源定位可回溯", "未凭空补写内容"], "required_evidence_level": "E2", "last_result": null},
+      {"id": "eval_low_quality_material", "name_zh": "低质量 OCR 与说话人不明", "status": "planned", "fixture_zh": "包含乱码页和无法区分说话人的转写", "assertions_zh": ["输出质量警告", "不把不确定说话人标成真实姓名", "触发人工确认"], "required_evidence_level": "E2", "last_result": null}
+    ]
+  },
+  "failure_policy": {
+    "known_failures_zh": ["文件损坏或加密", "OCR 质量不足", "音视频转写缺失", "表格字段无法识别"],
+    "retry_on_zh": ["临时解析服务错误", "允许列表连接器超时"],
+    "stop_on_zh": ["文件被策略阻断", "内容引用不存在", "用户撤销权限"],
+    "fallback_zh": ["允许用户粘贴纯文本", "保留可处理材料并明确缺失范围", "低质量段落转人工修正"],
+    "allow_partial_result": true
+  },
+  "personalization": {
+    "mode": "overlay",
+    "fields": [
+      {"key": "anonymize_participants", "label_zh": "匿名化参与者", "type": "boolean", "default": true, "affects": ["输出标识"], "requires_new_skill_version": false},
+      {"key": "speaker_merge_policy", "label_zh": "说话人合并规则", "type": "string", "default": "保守合并", "allowed_values": ["不合并", "保守合并", "按用户映射"], "affects": ["说话人标识"], "requires_new_skill_version": false},
+      {"key": "segment_length", "label_zh": "分段粒度", "type": "string", "default": "语义段落", "allowed_values": ["句子", "语义段落", "问答轮次"], "affects": ["输出分段"], "requires_new_skill_version": false}
+    ]
+  }
+}

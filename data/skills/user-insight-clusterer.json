@@ -1,0 +1,135 @@
+{
+  "manifest_version": "1.0.0",
+  "skill": {
+    "id": "skl_product_user_insight_clusterer",
+    "slug": "user-insight-clusterer",
+    "name_zh": "用户洞察主题聚类",
+    "summary_zh": "把跨访谈证据归并为可解释主题，同时展示覆盖人数、反例、分歧和证据强度。",
+    "domain": "internet-product-operations",
+    "status": "draft",
+    "source_type": "platform-example",
+    "source_status": "example-only",
+    "author": {"display_name": "Skillflow 产品示例（占位）", "status": "example-placeholder", "source_url": null},
+    "tags": ["用户研究", "主题聚类", "洞察", "反例", "证据"]
+  },
+  "task": {
+    "definition_zh": "基于证据卡识别重复主题、重要分歧和少数但高影响的问题，不把相似措辞机械视为同一需求。",
+    "jobs_to_be_done_zh": "当产品经理完成多场访谈后，希望看见哪些模式真正重复出现，以及哪些结论只有弱证据。",
+    "applies_when_zh": ["至少有两位参与者或多个独立来源", "证据卡带参与者和原文定位", "需要形成研究主题而非直接写解决方案"],
+    "not_for_zh": ["统计推断到总体用户比例", "自动决定需求优先级", "在只有单一证据时声称形成普遍主题", "忽略与主流结论冲突的证据"],
+    "success_criteria_zh": ["主题绑定支持与反对证据 ID", "展示独立参与者覆盖而非只数引用条数", "单例主题明确标注", "相互重叠主题可解释"],
+    "assumptions_zh": ["evidence_id 与 participant/source 信息完整", "输入证据已完成基本复核"]
+  },
+  "node": {
+    "type": "ai-cognitive",
+    "cognitive_fit": "high",
+    "autonomy_risk": "medium",
+    "recommended_execution_mode": "ai-draft-human-approve",
+    "human_gate_zh": "研究负责人确认主题命名、合并边界和反例后，才能进入产品机会判断。"
+  },
+  "contracts": {
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["research_goal", "evidence_items"],
+      "properties": {
+        "research_goal": {"type": "string"},
+        "evidence_items": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "required": ["evidence_id", "source_id", "category", "quote", "interpretation"],
+            "properties": {
+              "evidence_id": {"type": "string"},
+              "source_id": {"type": "string"},
+              "participant_id": {"type": ["string", "null"]},
+              "category": {"type": "string"},
+              "quote": {"type": "string"},
+              "interpretation": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "output_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["themes", "unclustered_evidence", "limitations"],
+      "properties": {
+        "themes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["theme_id", "title", "statement", "supporting_evidence_ids", "counter_evidence_ids", "independent_source_count", "strength"],
+            "properties": {
+              "theme_id": {"type": "string"},
+              "title": {"type": "string"},
+              "statement": {"type": "string"},
+              "supporting_evidence_ids": {"type": "array", "items": {"type": "string"}},
+              "counter_evidence_ids": {"type": "array", "items": {"type": "string"}},
+              "independent_source_count": {"type": "integer", "minimum": 1},
+              "strength": {"type": "string", "enum": ["single-case", "emerging", "repeated", "contested"]}
+            }
+          }
+        },
+        "unclustered_evidence": {"type": "array", "items": {"type": "string"}},
+        "limitations": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  },
+  "permissions": {
+    "risk_level": "medium",
+    "read": ["结构化访谈证据卡"],
+    "write": ["本次运行的主题草案"],
+    "network": {"mode": "none", "allowlist": []},
+    "credentials": [],
+    "external_actions": [],
+    "requires_per_run_confirmation": false
+  },
+  "connectors": {"required": [], "optional": []},
+  "region_data_policy": {
+    "default_processing_region": "CN",
+    "allowed_processing_regions": ["CN"],
+    "foreign_model_policy": {"allowed": true, "requires_explicit_consent": true, "disclosure_zh": "使用境外模型前须明确告知证据卡内容和数据接收方。"},
+    "data_classes_allowed": ["一般内部资料", "经授权且已尽量匿名化的访谈证据"],
+    "data_classes_blocked": ["国家秘密", "未获授权的敏感个人信息"],
+    "retention": {"unsaved_input_hours": 24, "temporary_output_hours": 24, "saved_asset_policy_zh": "保存的主题随项目保留至用户删除。"},
+    "training_policy_zh": "用户材料不得用于公共模型训练。"
+  },
+  "execution": {
+    "class": "instruction-only",
+    "runtime": "skillflow-cn-sandbox",
+    "timeout_seconds": 300,
+    "max_retries": 1,
+    "sandbox_required": true,
+    "side_effects": ["生成主题聚类草案"],
+    "human_gate": "required-before-downstream"
+  },
+  "evidence": {"current_level": "E0", "target_level_before_recommendation": "E2", "claims_zh": ["当前为平台示例，尚未验证聚类稳定性和人工一致性。"], "records": []},
+  "license": {"declared_license": null, "source_status": "example-placeholder", "internal_tier": "L0_EXAMPLE_ONLY", "commercial_use_status": "blocked-until-verified", "notice_zh": "平台示例清单；未声明任何真实外部开源作者或许可证。"},
+  "versioning": {"current_version": "0.1.0", "versions": [{"version": "0.1.0", "status": "draft", "content_hash": null, "breaking_change": false, "changes_zh": ["建立主题、反例和证据强度契约"]}]},
+  "evaluations": {
+    "cases": [
+      {"id": "eval_cluster_repeated_and_contested", "name_zh": "重复主题与争议主题", "status": "planned", "fixture_zh": "六位受访者中四位支持、两位反对同一协作提醒机制", "assertions_zh": ["同时绑定支持与反对证据", "主题标为 contested", "按独立来源计数"], "required_evidence_level": "E2", "last_result": null},
+      {"id": "eval_avoid_false_majority", "name_zh": "避免把重复引用当成多数用户", "status": "planned", "fixture_zh": "同一参与者在多个片段反复表达一个观点", "assertions_zh": ["独立来源数为一", "主题标为 single-case", "不声称多数用户存在该问题"], "required_evidence_level": "E2", "last_result": null}
+    ]
+  },
+  "failure_policy": {
+    "known_failures_zh": ["把措辞相似但机制不同的问题合并", "忽略反例", "按引用条数错误估计用户覆盖", "主题粒度过大"],
+    "retry_on_zh": ["输出未通过 Schema", "主题存在完全重复项"],
+    "stop_on_zh": ["证据没有 source_id", "输入少于两个证据条目"],
+    "fallback_zh": ["保留未聚类证据", "降低主题数量并要求人工命名", "返回证据矩阵而不强行聚类"],
+    "allow_partial_result": true
+  },
+  "personalization": {
+    "mode": "overlay",
+    "fields": [
+      {"key": "max_theme_count", "label_zh": "最多主题数", "type": "integer", "default": 8, "affects": ["主题粒度"], "requires_new_skill_version": false},
+      {"key": "minimum_independent_sources", "label_zh": "重复主题最少独立来源", "type": "integer", "default": 2, "affects": ["证据强度"], "requires_new_skill_version": false},
+      {"key": "preserve_outliers", "label_zh": "保留少数反例", "type": "boolean", "default": true, "affects": ["反例与限制"], "requires_new_skill_version": false}
+    ]
+  }
+}

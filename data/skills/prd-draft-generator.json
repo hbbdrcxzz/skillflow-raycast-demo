@@ -1,0 +1,103 @@
+{
+  "manifest_version": "1.0.0",
+  "skill": {
+    "id": "skl_product_prd_draft_generator",
+    "slug": "prd-draft-generator",
+    "name_zh": "证据驱动 PRD 草稿",
+    "summary_zh": "根据已批准的产品机会、用户证据和约束生成可评审的 PRD 草稿，并显式保留未知项。",
+    "domain": "internet-product-operations",
+    "status": "draft",
+    "source_type": "platform-example",
+    "source_status": "example-only",
+    "author": {"display_name": "Skillflow 产品示例（占位）", "status": "example-placeholder", "source_url": null},
+    "tags": ["PRD", "产品需求", "验收标准", "范围", "用户证据"]
+  },
+  "task": {
+    "definition_zh": "将已批准的机会和证据组织成包含目标、用户、范围、需求、验收标准、指标、风险和开放问题的 PRD 草稿。",
+    "jobs_to_be_done_zh": "当产品方向已经由负责人确认时，希望快速获得一份结构完整、可继续评审而非虚构细节的 PRD 初稿。",
+    "applies_when_zh": ["至少一个产品机会已被人工批准", "有用户证据或明确业务依据", "产品约束和非目标可被提供或标注未知"],
+    "not_for_zh": ["代替产品负责人签字立项", "自动承诺研发排期", "虚构技术架构、法律要求或指标基线", "直接写入 Jira 或对外发布"],
+    "success_criteria_zh": ["需求可追溯到机会或证据", "包含明确非目标和开放问题", "每项核心需求有可验证验收标准", "未知事实被标记而非补写"],
+    "assumptions_zh": ["输入机会已经人工批准", "任何排期、资源或技术结论都需要后续负责人确认"]
+  },
+  "node": {"type": "ai-cognitive", "cognitive_fit": "high", "autonomy_risk": "high", "recommended_execution_mode": "ai-draft-human-approve", "human_gate_zh": "产品、设计和研发负责人评审后，才能进入 Jira 或正式需求池。"},
+  "contracts": {
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["product_name", "approved_opportunity", "evidence_index"],
+      "properties": {
+        "product_name": {"type": "string"},
+        "approved_opportunity": {
+          "type": "object",
+          "required": ["opportunity_id", "user_problem", "desired_outcome", "evidence_ids"],
+          "properties": {
+            "opportunity_id": {"type": "string"},
+            "user_problem": {"type": "string"},
+            "desired_outcome": {"type": "string"},
+            "evidence_ids": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "evidence_index": {"type": "array", "items": {"type": "object", "required": ["evidence_id", "summary"], "properties": {"evidence_id": {"type": "string"}, "summary": {"type": "string"}}}},
+        "constraints": {"type": "array", "items": {"type": "string"}},
+        "known_metrics": {"type": "object"},
+        "template_profile": {"type": "string"}
+      }
+    },
+    "output_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prd", "traceability", "open_questions"],
+      "properties": {
+        "prd": {
+          "type": "object",
+          "required": ["title", "background", "goal", "non_goals", "target_users", "requirements", "success_metrics", "risks"],
+          "properties": {
+            "title": {"type": "string"},
+            "background": {"type": "string"},
+            "goal": {"type": "string"},
+            "non_goals": {"type": "array", "items": {"type": "string"}},
+            "target_users": {"type": "array", "items": {"type": "string"}},
+            "requirements": {"type": "array", "items": {"type": "object", "required": ["requirement_id", "statement", "acceptance_criteria"], "properties": {"requirement_id": {"type": "string"}, "statement": {"type": "string"}, "acceptance_criteria": {"type": "array", "items": {"type": "string"}}}}},
+            "success_metrics": {"type": "array", "items": {"type": "string"}},
+            "risks": {"type": "array", "items": {"type": "string"}}
+          }
+        },
+        "traceability": {"type": "array", "items": {"type": "object", "required": ["requirement_id", "evidence_ids"], "properties": {"requirement_id": {"type": "string"}, "evidence_ids": {"type": "array", "items": {"type": "string"}}}}},
+        "open_questions": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  },
+  "permissions": {"risk_level": "medium", "read": ["已批准机会、用户证据摘要、产品约束和模板"], "write": ["本次运行的 PRD 草稿"], "network": {"mode": "none", "allowlist": []}, "credentials": [], "external_actions": [], "requires_per_run_confirmation": false},
+  "connectors": {"required": [], "optional": [{"connector_id": "feishu-docs", "mode": "write", "purpose_zh": "经用户确认后由独立输出节点写入飞书文档"}, {"connector_id": "jira", "mode": "write", "purpose_zh": "经人工评审后由独立输出节点创建需求条目"}]},
+  "region_data_policy": {
+    "default_processing_region": "CN",
+    "allowed_processing_regions": ["CN"],
+    "foreign_model_policy": {"allowed": true, "requires_explicit_consent": true, "disclosure_zh": "若选择境外模型，须告知产品背景、证据摘要和约束将被发送的范围。"},
+    "data_classes_allowed": ["一般内部产品资料", "匿名化用户研究摘要"],
+    "data_classes_blocked": ["国家秘密", "密钥", "未获授权的敏感个人信息"],
+    "retention": {"unsaved_input_hours": 24, "temporary_output_hours": 24, "saved_asset_policy_zh": "保存的 PRD 随项目保留至用户删除。"},
+    "training_policy_zh": "用户材料不得用于公共模型训练。"
+  },
+  "execution": {"class": "instruction-only", "runtime": "skillflow-cn-sandbox", "timeout_seconds": 360, "max_retries": 1, "sandbox_required": true, "side_effects": ["生成 PRD 草稿，不直接写入外部系统"], "human_gate": "required-before-external-write"},
+  "evidence": {"current_level": "E0", "target_level_before_recommendation": "E2", "claims_zh": ["当前为平台示例，尚未完成 PRD 完整性和可追溯性评测。"], "records": []},
+  "license": {"declared_license": null, "source_status": "example-placeholder", "internal_tier": "L0_EXAMPLE_ONLY", "commercial_use_status": "blocked-until-verified", "notice_zh": "平台示例清单；作者与许可证待确认。"},
+  "versioning": {"current_version": "0.1.0", "versions": [{"version": "0.1.0", "status": "draft", "content_hash": null, "breaking_change": false, "changes_zh": ["建立证据驱动 PRD 输出契约"]}]},
+  "evaluations": {
+    "cases": [
+      {"id": "eval_prd_traceability", "name_zh": "需求证据可追溯", "status": "planned", "fixture_zh": "一个已批准机会、六条证据和两项业务约束", "assertions_zh": ["每项核心需求绑定证据", "包含非目标", "验收标准可验证"], "required_evidence_level": "E2", "last_result": null},
+      {"id": "eval_prd_unknowns", "name_zh": "未知信息不被虚构", "status": "planned", "fixture_zh": "缺少研发排期、指标基线和技术方案", "assertions_zh": ["未知项进入 open_questions", "不虚构排期和指标基线", "不声称技术方案已确认"], "required_evidence_level": "E2", "last_result": null}
+    ]
+  },
+  "failure_policy": {"known_failures_zh": ["需求缺乏证据", "验收标准不可检验", "虚构排期或技术细节", "范围失控"], "retry_on_zh": ["输出未通过 Schema", "requirement_id 重复"], "stop_on_zh": ["机会未被批准", "证据索引为空"], "fallback_zh": ["只生成 PRD 骨架和开放问题", "转产品负责人补充范围后再运行"], "allow_partial_result": true},
+  "personalization": {
+    "mode": "overlay",
+    "fields": [
+      {"key": "prd_template", "label_zh": "PRD 模板", "type": "string", "default": "标准产品需求", "allowed_values": ["标准产品需求", "轻量需求卡", "实验方案", "增长需求"], "affects": ["章节结构"], "requires_new_skill_version": false},
+      {"key": "detail_level", "label_zh": "详细程度", "type": "string", "default": "评审版", "allowed_values": ["摘要", "评审版", "详细版"], "affects": ["篇幅和细节"], "requires_new_skill_version": false},
+      {"key": "required_sections", "label_zh": "必备章节", "type": "array", "default": ["目标", "非目标", "需求", "验收标准", "指标", "风险", "开放问题"], "affects": ["输出结构"], "requires_new_skill_version": false}
+    ]
+  }
+}

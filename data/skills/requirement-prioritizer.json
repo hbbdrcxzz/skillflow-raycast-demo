@@ -1,0 +1,80 @@
+{
+  "manifest_version": "1.0.0",
+  "skill": {
+    "id": "skl_product_requirement_prioritizer",
+    "slug": "requirement-prioritizer",
+    "name_zh": "需求池优先级辅助",
+    "summary_zh": "按显式规则整理需求证据、影响、成本和不确定性，生成供产品负责人评审的排序草案。",
+    "domain": "internet-product-operations",
+    "status": "draft",
+    "source_type": "platform-example",
+    "source_status": "example-only",
+    "author": {"display_name": "Skillflow 产品示例（占位）", "status": "example-placeholder", "source_url": null},
+    "tags": ["需求池", "优先级", "RICE", "证据", "决策"]
+  },
+  "task": {
+    "definition_zh": "使用用户选定的透明评分框架对需求候选进行标准化比较，并单独暴露缺失数据、依赖和决策风险。",
+    "jobs_to_be_done_zh": "当需求池来源混杂且讨论失焦时，产品负责人希望先得到一份可解释排序和待补证据清单。",
+    "applies_when_zh": ["需求候选、评分框架和战略约束明确", "至少能提供部分影响或证据数据", "排序只作为人工评审输入"],
+    "not_for_zh": ["代替负责人做最终路线图决策", "让 AI 自行编造 Reach、Impact、Confidence 或 Effort", "用数学分数掩盖合规和阻断依赖", "自动写入正式路线图"],
+    "success_criteria_zh": ["所有分数有来源或标记为缺失", "战略约束和阻断依赖不被总分抵消", "显示敏感变量和排序反转条件", "最终排序保留人工调整理由"],
+    "assumptions_zh": ["用户确认评分框架", "缺失数据允许输出未知而非自动估算"]
+  },
+  "node": {"type": "ai-cognitive", "cognitive_fit": "medium", "autonomy_risk": "high", "recommended_execution_mode": "ai-draft-human-approve", "human_gate_zh": "产品负责人确认评分输入、战略例外和最终排序。"},
+  "contracts": {
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["framework", "requirements"],
+      "properties": {
+        "framework": {"type": "string", "enum": ["RICE", "ICE", "value-effort", "custom"]},
+        "custom_formula": {"type": ["string", "null"]},
+        "strategic_constraints": {"type": "array", "items": {"type": "string"}},
+        "requirements": {"type": "array", "minItems": 2, "items": {"type": "object", "required": ["requirement_id", "title", "evidence_refs"], "properties": {"requirement_id": {"type": "string"}, "title": {"type": "string"}, "evidence_refs": {"type": "array", "items": {"type": "string"}}, "reach": {"type": ["number", "null"]}, "impact": {"type": ["number", "null"]}, "confidence": {"type": ["number", "null"]}, "effort": {"type": ["number", "null"]}, "dependencies": {"type": "array", "items": {"type": "string"}}}}}
+      }
+    },
+    "output_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ranked_requirements", "missing_inputs", "sensitivity_notes", "human_decisions_required"],
+      "properties": {
+        "ranked_requirements": {"type": "array", "items": {"type": "object", "required": ["requirement_id", "rank", "score_status", "rationale", "evidence_refs"], "properties": {"requirement_id": {"type": "string"}, "rank": {"type": "integer", "minimum": 1}, "score": {"type": ["number", "null"]}, "score_status": {"type": "string", "enum": ["complete", "partial", "blocked"]}, "rationale": {"type": "string"}, "evidence_refs": {"type": "array", "items": {"type": "string"}}}}},
+        "missing_inputs": {"type": "array", "items": {"type": "string"}},
+        "sensitivity_notes": {"type": "array", "items": {"type": "string"}},
+        "human_decisions_required": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  },
+  "permissions": {"risk_level": "medium", "read": ["需求池、评分输入、证据引用和战略约束"], "write": ["本次运行的排序草案"], "network": {"mode": "none", "allowlist": []}, "credentials": [], "external_actions": [], "requires_per_run_confirmation": false},
+  "connectors": {"required": [], "optional": [{"connector_id": "jira", "mode": "read", "purpose_zh": "读取用户授权的需求候选和状态"}, {"connector_id": "feishu-bitable", "mode": "read", "purpose_zh": "读取用户授权的需求池和评分字段"}]},
+  "region_data_policy": {
+    "default_processing_region": "CN",
+    "allowed_processing_regions": ["CN"],
+    "foreign_model_policy": {"allowed": true, "requires_explicit_consent": true, "disclosure_zh": "境外模型启用前须告知将发送的需求、证据摘要和战略约束。"},
+    "data_classes_allowed": ["一般内部产品资料", "匿名化用户需求证据"],
+    "data_classes_blocked": ["国家秘密", "密钥", "未获授权的敏感个人信息"],
+    "retention": {"unsaved_input_hours": 24, "temporary_output_hours": 24, "saved_asset_policy_zh": "保存的排序随项目保留至用户删除。"},
+    "training_policy_zh": "用户材料不得用于公共模型训练。"
+  },
+  "execution": {"class": "instruction-only", "runtime": "skillflow-cn-sandbox", "timeout_seconds": 240, "max_retries": 1, "sandbox_required": true, "side_effects": ["生成排序草案，不写入正式需求池"], "human_gate": "required-before-downstream"},
+  "evidence": {"current_level": "E0", "target_level_before_recommendation": "E2", "claims_zh": ["当前为平台示例，尚未验证缺失数据处理和排序稳定性。"], "records": []},
+  "license": {"declared_license": null, "source_status": "example-placeholder", "internal_tier": "L0_EXAMPLE_ONLY", "commercial_use_status": "blocked-until-verified", "notice_zh": "平台示例清单；作者与许可证待确认。"},
+  "versioning": {"current_version": "0.1.0", "versions": [{"version": "0.1.0", "status": "draft", "content_hash": null, "breaking_change": false, "changes_zh": ["建立可解释需求排序契约"]}]},
+  "evaluations": {
+    "cases": [
+      {"id": "eval_rank_complete_requirements", "name_zh": "完整输入下的透明排序", "status": "planned", "fixture_zh": "五条需求，具有完整 RICE 输入和一项战略约束", "assertions_zh": ["分数计算可复核", "战略约束单独显示", "排序理由绑定证据"], "required_evidence_level": "E2", "last_result": null},
+      {"id": "eval_missing_effort", "name_zh": "缺失成本不被编造", "status": "planned", "fixture_zh": "两条需求缺少 Effort，一条存在阻断依赖", "assertions_zh": ["不编造 Effort", "缺失项标为 partial", "阻断依赖不被高影响分抵消"], "required_evidence_level": "E2", "last_result": null}
+    ]
+  },
+  "failure_policy": {"known_failures_zh": ["编造评分输入", "把总分当最终决定", "忽略阻断依赖", "不同量纲混算"], "retry_on_zh": ["确定性分数计算失败", "输出未通过 Schema"], "stop_on_zh": ["评分框架未知且没有自定义公式", "需求少于两条"], "fallback_zh": ["输出需求证据矩阵而不排序", "要求补充缺失输入", "保留人工战略例外"], "allow_partial_result": true},
+  "personalization": {
+    "mode": "overlay",
+    "fields": [
+      {"key": "framework", "label_zh": "评分框架", "type": "string", "default": "RICE", "allowed_values": ["RICE", "ICE", "value-effort", "custom"], "affects": ["分数计算"], "requires_new_skill_version": false},
+      {"key": "unknown_value_policy", "label_zh": "缺失值策略", "type": "string", "default": "保留未知", "allowed_values": ["保留未知", "人工补充", "排除该项"], "affects": ["排序状态"], "requires_new_skill_version": false},
+      {"key": "show_sensitivity", "label_zh": "显示敏感性分析", "type": "boolean", "default": true, "affects": ["排序反转条件"], "requires_new_skill_version": false}
+    ]
+  }
+}

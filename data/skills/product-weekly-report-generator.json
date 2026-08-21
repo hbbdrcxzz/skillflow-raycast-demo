@@ -1,0 +1,83 @@
+{
+  "manifest_version": "1.0.0",
+  "skill": {
+    "id": "skl_product_weekly_report_generator",
+    "slug": "product-weekly-report-generator",
+    "name_zh": "产品运营周报生成",
+    "summary_zh": "把产品进展、运营数据、用户反馈、竞品变化和风险整理为有来源、可行动的周报草稿。",
+    "domain": "internet-product-operations",
+    "status": "draft",
+    "source_type": "platform-example",
+    "source_status": "example-only",
+    "author": {"display_name": "Skillflow 产品示例（占位）", "status": "example-placeholder", "source_url": null},
+    "tags": ["产品周报", "运营周报", "进展", "风险", "行动项"]
+  },
+  "task": {
+    "definition_zh": "将指定周期内的结构化事实和分析结果压缩为面向目标读者的周报，并区分事实、解释、风险和待办。",
+    "jobs_to_be_done_zh": "当产品运营团队需要向管理层或协作团队同步时，希望快速获得一份不遗漏风险、不过度包装的周报。",
+    "applies_when_zh": ["报告周期和读者明确", "至少有一种事实来源", "输入项带来源或责任人"],
+    "not_for_zh": ["虚构缺失的指标或进展", "自动承诺他人的行动和截止日期", "未经确认发送到外部群或客户", "代替正式事故报告或财务报告"],
+    "success_criteria_zh": ["关键数字和结论有来源", "包含进展、变化、风险和下一步", "明确未知和待确认项", "篇幅与目标读者匹配"],
+    "assumptions_zh": ["输入数据已由上游节点完成基本校验", "对外发送由独立输出节点负责"]
+  },
+  "node": {"type": "ai-cognitive", "cognitive_fit": "high", "autonomy_risk": "medium", "recommended_execution_mode": "ai-draft-human-approve", "human_gate_zh": "报告负责人确认事实、责任人和行动项后才能写入或发送。"},
+  "contracts": {
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["period", "audience", "source_items"],
+      "properties": {
+        "period": {"type": "object", "required": ["start", "end"], "properties": {"start": {"type": "string"}, "end": {"type": "string"}}},
+        "audience": {"type": "string", "enum": ["product-team", "cross-functional", "management", "operations-team"]},
+        "source_items": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["item_id", "category", "content", "source_ref"], "properties": {"item_id": {"type": "string"}, "category": {"type": "string", "enum": ["progress", "metric", "feedback", "competitor-change", "decision", "risk", "incident", "action"]}, "content": {"type": "string"}, "source_ref": {"type": "string"}, "owner": {"type": ["string", "null"]}}}},
+        "previous_report": {"type": ["object", "null"]},
+        "report_template": {"type": "string"}
+      }
+    },
+    "output_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["headline", "executive_summary", "sections", "actions", "source_map", "open_questions"],
+      "properties": {
+        "headline": {"type": "string"},
+        "executive_summary": {"type": "array", "items": {"type": "string"}},
+        "sections": {"type": "array", "items": {"type": "object", "required": ["title", "items"], "properties": {"title": {"type": "string"}, "items": {"type": "array", "items": {"type": "string"}}}}},
+        "actions": {"type": "array", "items": {"type": "object", "required": ["action", "owner_status"], "properties": {"action": {"type": "string"}, "owner_status": {"type": "string", "enum": ["confirmed", "unconfirmed"]}, "owner": {"type": ["string", "null"]}, "due_date": {"type": ["string", "null"]}}}},
+        "source_map": {"type": "array", "items": {"type": "object", "required": ["statement", "source_refs"], "properties": {"statement": {"type": "string"}, "source_refs": {"type": "array", "items": {"type": "string"}}}}},
+        "open_questions": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  },
+  "permissions": {"risk_level": "medium", "read": ["用户选择的产品、运营、竞品和项目事实"], "write": ["本次运行的周报草稿"], "network": {"mode": "none", "allowlist": []}, "credentials": [], "external_actions": [], "requires_per_run_confirmation": false},
+  "connectors": {"required": [], "optional": [{"connector_id": "feishu-docs", "mode": "read-write", "purpose_zh": "经用户确认后读取资料或由输出节点写入周报"}, {"connector_id": "jira", "mode": "read", "purpose_zh": "读取用户授权的项目进展和需求状态"}]},
+  "region_data_policy": {
+    "default_processing_region": "CN",
+    "allowed_processing_regions": ["CN"],
+    "foreign_model_policy": {"allowed": true, "requires_explicit_consent": true, "disclosure_zh": "境外模型启用前须告知将发送的周报事实、指标摘要和内部产品信息。"},
+    "data_classes_allowed": ["一般内部产品运营资料", "公开竞品资料", "匿名化用户反馈"],
+    "data_classes_blocked": ["国家秘密", "密钥", "未获授权的敏感个人信息"],
+    "retention": {"unsaved_input_hours": 24, "temporary_output_hours": 24, "saved_asset_policy_zh": "保存的周报随项目保留至用户删除。"},
+    "training_policy_zh": "用户材料不得用于公共模型训练。"
+  },
+  "execution": {"class": "instruction-only", "runtime": "skillflow-cn-sandbox", "timeout_seconds": 360, "max_retries": 1, "sandbox_required": true, "side_effects": ["生成周报草稿，不自动发送"], "human_gate": "required-before-external-write"},
+  "evidence": {"current_level": "E0", "target_level_before_recommendation": "E2", "claims_zh": ["当前为平台示例，尚未验证事实覆盖率和行动项准确性。"], "records": []},
+  "license": {"declared_license": null, "source_status": "example-placeholder", "internal_tier": "L0_EXAMPLE_ONLY", "commercial_use_status": "blocked-until-verified", "notice_zh": "平台示例清单；作者与许可证待确认。"},
+  "versioning": {"current_version": "0.1.0", "versions": [{"version": "0.1.0", "status": "draft", "content_hash": null, "breaking_change": false, "changes_zh": ["建立多来源产品运营周报契约"]}]},
+  "evaluations": {
+    "cases": [
+      {"id": "eval_weekly_report_traceability", "name_zh": "多来源周报可追溯", "status": "planned", "fixture_zh": "包含 Jira 进展、运营指标、用户反馈和竞品变化的周度材料", "assertions_zh": ["关键结论绑定来源", "未确认责任人被标注", "同时包含风险和下一步"], "required_evidence_level": "E2", "last_result": null},
+      {"id": "eval_weekly_report_missing_data", "name_zh": "缺失指标不被补写", "status": "planned", "fixture_zh": "本周缺少留存数据但上周报告包含该指标", "assertions_zh": ["不沿用旧数字冒充本周数据", "缺失项进入 open_questions", "不虚构趋势"], "required_evidence_level": "E2", "last_result": null}
+    ]
+  },
+  "failure_policy": {"known_failures_zh": ["旧报告事实被误当本周事实", "责任人或截止日被虚构", "竞品假设写成事实", "篇幅失控"], "retry_on_zh": ["输出未通过 Schema"], "stop_on_zh": ["报告周期缺失", "所有来源为空"], "fallback_zh": ["只生成事实清单和缺失项", "保留未确认行动项供人工补充"], "allow_partial_result": true},
+  "personalization": {
+    "mode": "overlay",
+    "fields": [
+      {"key": "audience", "label_zh": "目标读者", "type": "string", "default": "cross-functional", "allowed_values": ["product-team", "cross-functional", "management", "operations-team"], "affects": ["摘要和细节"], "requires_new_skill_version": false},
+      {"key": "report_length", "label_zh": "周报长度", "type": "string", "default": "标准", "allowed_values": ["一屏摘要", "标准", "详细"], "affects": ["篇幅"], "requires_new_skill_version": false},
+      {"key": "required_sections", "label_zh": "必备栏目", "type": "array", "default": ["本周进展", "关键数据", "用户与竞品", "风险", "下周行动"], "affects": ["输出结构"], "requires_new_skill_version": false}
+    ]
+  }
+}

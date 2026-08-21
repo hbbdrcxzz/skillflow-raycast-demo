@@ -1,0 +1,80 @@
+{
+  "manifest_version": "1.0.0",
+  "skill": {
+    "id": "skl_product_competitor_change_analyzer",
+    "slug": "competitor-change-analyzer",
+    "name_zh": "竞品变化分析",
+    "summary_zh": "比较竞品公开页面或版本材料，识别有证据的产品变化，并把事实变化与影响假设分开。",
+    "domain": "internet-product-operations",
+    "status": "draft",
+    "source_type": "platform-example",
+    "source_status": "example-only",
+    "author": {"display_name": "Skillflow 产品示例（占位）", "status": "example-placeholder", "source_url": null},
+    "tags": ["竞品分析", "变化监控", "产品策略", "公开信息", "周报"]
+  },
+  "task": {
+    "definition_zh": "对比竞品在两个时间点的公开材料，抽取功能、定价、定位、渠道或运营变化，并评估对当前产品的潜在影响。",
+    "jobs_to_be_done_zh": "当产品或运营团队定期监控竞品时，希望只看到值得关注的真实变化、来源和待验证影响，而不是网页噪音。",
+    "applies_when_zh": ["有基线快照和当前快照，或有带日期的版本材料", "监测对象与关注范围明确", "来源是用户有权访问的公开或已授权资料"],
+    "not_for_zh": ["绕过登录、付费墙或访问控制", "把网页文案变化直接解释为公司战略事实", "自动作出跟进决策", "监控个人或处理被禁止的数据"],
+    "success_criteria_zh": ["每项变化绑定前后证据和来源", "区分确认事实与影响假设", "过滤布局、时间戳等无业务意义噪音", "列出无法确认和需要人工检查的变化"],
+    "assumptions_zh": ["基线与当前材料可比较", "网页抓取由平台注册连接器完成"]
+  },
+  "node": {"type": "ai-cognitive", "cognitive_fit": "high", "autonomy_risk": "medium", "recommended_execution_mode": "ai-with-exception", "human_gate_zh": "高影响判断、来源冲突或疑似抓取噪音进入人工复核。"},
+  "contracts": {
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["competitor_name", "monitoring_focus", "baseline_documents", "current_documents"],
+      "properties": {
+        "competitor_name": {"type": "string"},
+        "monitoring_focus": {"type": "array", "minItems": 1, "items": {"type": "string", "enum": ["feature", "pricing", "positioning", "channel", "content", "integration", "policy"]}},
+        "product_context": {"type": "string"},
+        "baseline_documents": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["document_id", "captured_at", "content_ref", "source_url"], "properties": {"document_id": {"type": "string"}, "captured_at": {"type": "string"}, "content_ref": {"type": "string"}, "source_url": {"type": "string"}}}},
+        "current_documents": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["document_id", "captured_at", "content_ref", "source_url"], "properties": {"document_id": {"type": "string"}, "captured_at": {"type": "string"}, "content_ref": {"type": "string"}, "source_url": {"type": "string"}}}}
+      }
+    },
+    "output_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["confirmed_changes", "impact_hypotheses", "review_queue"],
+      "properties": {
+        "confirmed_changes": {"type": "array", "items": {"type": "object", "required": ["change_id", "category", "before", "after", "source_urls", "confidence"], "properties": {"change_id": {"type": "string"}, "category": {"type": "string"}, "before": {"type": "string"}, "after": {"type": "string"}, "source_urls": {"type": "array", "items": {"type": "string"}}, "confidence": {"type": "number", "minimum": 0, "maximum": 1}}}},
+        "impact_hypotheses": {"type": "array", "items": {"type": "object", "required": ["change_id", "hypothesis", "why_it_may_matter", "reversal_condition"], "properties": {"change_id": {"type": "string"}, "hypothesis": {"type": "string"}, "why_it_may_matter": {"type": "string"}, "reversal_condition": {"type": "string"}}}},
+        "review_queue": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  },
+  "permissions": {"risk_level": "medium", "read": ["用户指定的公开网页快照和已授权材料"], "write": ["本次运行的变化记录和影响假设"], "network": {"mode": "connector-only", "allowlist": []}, "credentials": [], "external_actions": [], "requires_per_run_confirmation": false},
+  "connectors": {"required": [{"connector_id": "web-public-read", "mode": "read", "purpose_zh": "读取用户指定且允许访问的公开网页或其平台快照"}], "optional": [{"connector_id": "source-upload", "mode": "read", "purpose_zh": "读取用户上传的版本记录或截图转写"}]},
+  "region_data_policy": {
+    "default_processing_region": "CN",
+    "allowed_processing_regions": ["CN"],
+    "foreign_model_policy": {"allowed": true, "requires_explicit_consent": true, "disclosure_zh": "境外模型启用前须告知将发送的公开网页内容与内部产品背景。"},
+    "data_classes_allowed": ["公开资料", "一般内部产品背景"],
+    "data_classes_blocked": ["绕过访问控制取得的数据", "国家秘密", "密钥"],
+    "retention": {"unsaved_input_hours": 24, "temporary_output_hours": 24, "saved_asset_policy_zh": "用户保存的竞品快照和分析保留至用户删除。"},
+    "training_policy_zh": "用户提供的内部背景不得用于公共模型训练。"
+  },
+  "execution": {"class": "instruction-only", "runtime": "skillflow-cn-sandbox", "timeout_seconds": 480, "max_retries": 2, "sandbox_required": true, "side_effects": ["生成竞品变化记录，不主动持续监控或发布"], "human_gate": "conditional"},
+  "evidence": {"current_level": "E0", "target_level_before_recommendation": "E2", "claims_zh": ["当前为平台示例，尚未完成网页噪音过滤和变化准确率评测。"], "records": []},
+  "license": {"declared_license": null, "source_status": "example-placeholder", "internal_tier": "L0_EXAMPLE_ONLY", "commercial_use_status": "blocked-until-verified", "notice_zh": "平台示例清单；不代表任何竞品内容获得再分发许可，来源与使用权需逐项审查。"},
+  "versioning": {"current_version": "0.1.0", "versions": [{"version": "0.1.0", "status": "draft", "content_hash": null, "breaking_change": false, "changes_zh": ["建立竞品前后证据和影响假设契约"]}]},
+  "evaluations": {
+    "cases": [
+      {"id": "eval_detect_material_change", "name_zh": "识别有业务意义的变化", "status": "planned", "fixture_zh": "竞品定价页新增套餐并调整核心权益，同时发生无关布局变化", "assertions_zh": ["识别套餐和权益变化", "过滤布局噪音", "绑定前后来源"], "required_evidence_level": "E2", "last_result": null},
+      {"id": "eval_avoid_strategy_claim", "name_zh": "避免把文案变化当战略事实", "status": "planned", "fixture_zh": "首页口号变化但无产品或公告证据", "assertions_zh": ["事实仅描述文案变化", "战略解释标为假设", "给出反转条件"], "required_evidence_level": "E2", "last_result": null}
+    ]
+  },
+  "failure_policy": {"known_failures_zh": ["页面抓取不完整", "动态内容造成假变化", "不同地区页面误比较", "把假设写成事实"], "retry_on_zh": ["允许列表网页读取超时", "结构化输出失败"], "stop_on_zh": ["来源需要绕过访问控制", "基线与当前页面无法对应"], "fallback_zh": ["只输出文本 Diff 不做影响判断", "要求用户上传基线快照", "转人工确认高影响变化"], "allow_partial_result": true},
+  "personalization": {
+    "mode": "overlay",
+    "fields": [
+      {"key": "monitoring_focus", "label_zh": "监测重点", "type": "array", "default": ["feature", "pricing", "positioning"], "affects": ["变化筛选"], "requires_new_skill_version": false},
+      {"key": "materiality_threshold", "label_zh": "重要性阈值", "type": "string", "default": "中", "allowed_values": ["低", "中", "高"], "affects": ["输出变化数量"], "requires_new_skill_version": false},
+      {"key": "include_impact_hypotheses", "label_zh": "生成影响假设", "type": "boolean", "default": true, "affects": ["影响分析"], "requires_new_skill_version": false}
+    ]
+  }
+}

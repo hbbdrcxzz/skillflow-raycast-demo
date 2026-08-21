@@ -1,4 +1,784 @@
-// Intentionally empty by default.
-// Add Drizzle tables here when the site actually needs a database.
-// See examples/d1/db/schema.ts for an opt-in example.
-export {};
+import { sql } from "drizzle-orm";
+import {
+  index,
+  integer,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
+
+type JsonObject = Record<string, unknown>;
+type JsonValue = JsonObject | unknown[];
+
+const timestamps = {
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+};
+
+export const accounts = sqliteTable(
+  "accounts",
+  {
+    id: text("id").primaryKey(),
+    primaryEmail: text("primary_email"),
+    displayName: text("display_name").notNull().default(""),
+    avatarUrl: text("avatar_url"),
+    locale: text("locale").notNull().default("zh-CN"),
+    status: text("status", { enum: ["active", "suspended", "deleted"] })
+      .notNull()
+      .default("active"),
+    ...timestamps,
+    deletedAt: text("deleted_at"),
+  },
+  (table) => [
+    uniqueIndex("accounts_primary_email_uq").on(table.primaryEmail),
+    index("accounts_status_idx").on(table.status),
+  ],
+);
+
+export const workspaces = sqliteTable(
+  "workspaces",
+  {
+    id: text("id").primaryKey(),
+    type: text("type", { enum: ["personal", "organization"] })
+      .notNull()
+      .default("personal"),
+    name: text("name").notNull(),
+    slug: text("slug"),
+    status: text("status", { enum: ["active", "suspended", "deleted"] })
+      .notNull()
+      .default("active"),
+    dataRegion: text("data_region").notNull().default("global"),
+    crossBorderProcessingAllowed: integer("cross_border_processing_allowed", {
+      mode: "boolean",
+    })
+      .notNull()
+      .default(true),
+    settings: text("settings", { mode: "json" }).$type<JsonObject>(),
+    ...timestamps,
+    deletedAt: text("deleted_at"),
+  },
+  (table) => [
+    uniqueIndex("workspaces_slug_uq").on(table.slug),
+    index("workspaces_status_region_idx").on(table.status, table.dataRegion),
+  ],
+);
+
+export const memberships = sqliteTable(
+  "memberships",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["owner", "admin", "member", "viewer"] })
+      .notNull()
+      .default("owner"),
+    status: text("status", { enum: ["invited", "active", "suspended"] })
+      .notNull()
+      .default("active"),
+    invitedByAccountId: text("invited_by_account_id").references(
+      () => accounts.id,
+      { onDelete: "set null" },
+    ),
+    joinedAt: text("joined_at"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("memberships_workspace_account_uq").on(
+      table.workspaceId,
+      table.accountId,
+    ),
+    index("memberships_account_status_idx").on(table.accountId, table.status),
+    index("memberships_workspace_role_idx").on(table.workspaceId, table.role),
+  ],
+);
+
+export const skills = sqliteTable(
+  "skills",
+  {
+    id: text("id").primaryKey(),
+    slug: text("slug").notNull(),
+    ownerWorkspaceId: text("owner_workspace_id").references(() => workspaces.id, {
+      onDelete: "set null",
+    }),
+    createdByAccountId: text("created_by_account_id").references(
+      () => accounts.id,
+      { onDelete: "set null" },
+    ),
+    name: text("name").notNull(),
+    summary: text("summary").notNull().default(""),
+    sourceType: text("source_type", {
+      enum: ["native", "open_source_import", "fork"],
+    })
+      .notNull()
+      .default("native"),
+    visibility: text("visibility", { enum: ["private", "unlisted", "public"] })
+      .notNull()
+      .default("private"),
+    status: text("status", { enum: ["draft", "published", "blocked", "archived"] })
+      .notNull()
+      .default("draft"),
+    defaultReleaseId: text("default_release_id"),
+    tags: text("tags", { mode: "json" }).$type<string[]>(),
+    ...timestamps,
+    archivedAt: text("archived_at"),
+  },
+  (table) => [
+    uniqueIndex("skills_slug_uq").on(table.slug),
+    index("skills_owner_status_idx").on(table.ownerWorkspaceId, table.status),
+    index("skills_visibility_status_idx").on(table.visibility, table.status),
+    index("skills_source_type_idx").on(table.sourceType),
+  ],
+);
+
+export const skillReleases = sqliteTable(
+  "skill_releases",
+  {
+    id: text("id").primaryKey(),
+    skillId: text("skill_id")
+      .notNull()
+      .references(() => skills.id, { onDelete: "cascade" }),
+    version: text("version").notNull(),
+    status: text("status", {
+      enum: ["draft", "in_review", "published", "yanked", "revoked"],
+    })
+      .notNull()
+      .default("draft"),
+    format: text("format", { enum: ["agent_skills", "skillflow_native"] })
+      .notNull()
+      .default("agent_skills"),
+    sourceUrl: text("source_url"),
+    sourceCommit: text("source_commit"),
+    sourcePackageDigest: text("source_package_digest"),
+    artifactStorageKey: text("artifact_storage_key"),
+    artifactDigest: text("artifact_digest").notNull(),
+    manifest: text("manifest", { mode: "json" }).$type<JsonObject>().notNull(),
+    permissionManifest: text("permission_manifest", { mode: "json" })
+      .$type<JsonObject>()
+      .notNull(),
+    compatibilityManifest: text("compatibility_manifest", { mode: "json" })
+      .$type<JsonObject>()
+      .notNull(),
+    regionPolicy: text("region_policy", { mode: "json" })
+      .$type<JsonObject>()
+      .notNull(),
+    licenseSpdx: text("license_spdx"),
+    containsExecutableScripts: integer("contains_executable_scripts", {
+      mode: "boolean",
+    })
+      .notNull()
+      .default(false),
+    hostedExecutionPolicy: text("hosted_execution_policy", {
+      enum: ["deny", "built_in_only", "allowlisted"],
+    })
+      .notNull()
+      .default("deny"),
+    createdByAccountId: text("created_by_account_id").references(
+      () => accounts.id,
+      { onDelete: "set null" },
+    ),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    publishedAt: text("published_at"),
+    yankedAt: text("yanked_at"),
+    revokedAt: text("revoked_at"),
+  },
+  (table) => [
+    uniqueIndex("skill_releases_skill_version_uq").on(table.skillId, table.version),
+    uniqueIndex("skill_releases_digest_uq").on(table.artifactDigest),
+    index("skill_releases_skill_status_idx").on(table.skillId, table.status),
+    index("skill_releases_status_published_idx").on(table.status, table.publishedAt),
+    index("skill_releases_source_commit_idx").on(table.sourceUrl, table.sourceCommit),
+  ],
+);
+
+export const workflows = sqliteTable(
+  "workflows",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    createdByAccountId: text("created_by_account_id").references(
+      () => accounts.id,
+      { onDelete: "set null" },
+    ),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    sourceType: text("source_type", {
+      enum: ["blank", "generated", "template", "imported"],
+    })
+      .notNull()
+      .default("blank"),
+    visibility: text("visibility", { enum: ["private", "unlisted", "public"] })
+      .notNull()
+      .default("private"),
+    status: text("status", { enum: ["draft", "active", "archived"] })
+      .notNull()
+      .default("draft"),
+    ...timestamps,
+    archivedAt: text("archived_at"),
+  },
+  (table) => [
+    index("workflows_workspace_status_idx").on(table.workspaceId, table.status),
+    index("workflows_workspace_updated_idx").on(table.workspaceId, table.updatedAt),
+    index("workflows_visibility_status_idx").on(table.visibility, table.status),
+  ],
+);
+
+export const workflowVersions = sqliteTable(
+  "workflow_versions",
+  {
+    id: text("id").primaryKey(),
+    workflowId: text("workflow_id")
+      .notNull()
+      .references(() => workflows.id, { onDelete: "cascade" }),
+    revision: integer("revision").notNull(),
+    versionLabel: text("version_label"),
+    status: text("status", { enum: ["draft", "active", "superseded", "archived"] })
+      .notNull()
+      .default("draft"),
+    changeSummary: text("change_summary").notNull().default(""),
+    inputSchema: text("input_schema", { mode: "json" }).$type<JsonObject>(),
+    outputSchema: text("output_schema", { mode: "json" }).$type<JsonObject>(),
+    graphDigest: text("graph_digest").notNull(),
+    createdByAccountId: text("created_by_account_id").references(
+      () => accounts.id,
+      { onDelete: "set null" },
+    ),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    activatedAt: text("activated_at"),
+  },
+  (table) => [
+    uniqueIndex("workflow_versions_workflow_revision_uq").on(
+      table.workflowId,
+      table.revision,
+    ),
+    uniqueIndex("workflow_versions_workflow_digest_uq").on(
+      table.workflowId,
+      table.graphDigest,
+    ),
+    index("workflow_versions_workflow_status_idx").on(table.workflowId, table.status),
+  ],
+);
+
+export const workflowNodes = sqliteTable(
+  "workflow_nodes",
+  {
+    id: text("id").primaryKey(),
+    workflowVersionId: text("workflow_version_id")
+      .notNull()
+      .references(() => workflowVersions.id, { onDelete: "cascade" }),
+    nodeKey: text("node_key").notNull(),
+    kind: text("kind", {
+      enum: [
+        "skill",
+        "model",
+        "document_parse",
+        "transform",
+        "connector_read",
+        "connector_write",
+        "validation",
+        "human_review",
+        "human_decision",
+        "artifact_generate",
+      ],
+    }).notNull(),
+    name: text("name").notNull(),
+    skillReleaseId: text("skill_release_id").references(() => skillReleases.id, {
+      onDelete: "restrict",
+    }),
+    capability: text("capability"),
+    config: text("config", { mode: "json" }).$type<JsonObject>().notNull(),
+    inputSchema: text("input_schema", { mode: "json" }).$type<JsonObject>(),
+    outputSchema: text("output_schema", { mode: "json" }).$type<JsonObject>(),
+    positionX: integer("position_x").notNull().default(0),
+    positionY: integer("position_y").notNull().default(0),
+    ordinal: integer("ordinal").notNull().default(0),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("workflow_nodes_version_key_uq").on(
+      table.workflowVersionId,
+      table.nodeKey,
+    ),
+    index("workflow_nodes_version_ordinal_idx").on(
+      table.workflowVersionId,
+      table.ordinal,
+    ),
+    index("workflow_nodes_skill_release_idx").on(table.skillReleaseId),
+    index("workflow_nodes_capability_idx").on(table.capability),
+  ],
+);
+
+export const workflowEdges = sqliteTable(
+  "workflow_edges",
+  {
+    id: text("id").primaryKey(),
+    workflowVersionId: text("workflow_version_id")
+      .notNull()
+      .references(() => workflowVersions.id, { onDelete: "cascade" }),
+    sourceNodeId: text("source_node_id")
+      .notNull()
+      .references(() => workflowNodes.id, { onDelete: "cascade" }),
+    targetNodeId: text("target_node_id")
+      .notNull()
+      .references(() => workflowNodes.id, { onDelete: "cascade" }),
+    sourceHandle: text("source_handle").notNull().default("default"),
+    targetHandle: text("target_handle").notNull().default("default"),
+    condition: text("condition", { mode: "json" }).$type<JsonObject>(),
+    ordinal: integer("ordinal").notNull().default(0),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("workflow_edges_version_path_uq").on(
+      table.workflowVersionId,
+      table.sourceNodeId,
+      table.targetNodeId,
+      table.sourceHandle,
+      table.targetHandle,
+    ),
+    index("workflow_edges_source_idx").on(table.workflowVersionId, table.sourceNodeId),
+    index("workflow_edges_target_idx").on(table.workflowVersionId, table.targetNodeId),
+  ],
+);
+
+export const personalConfigurations = sqliteTable(
+  "personal_configurations",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    skillReleaseId: text("skill_release_id")
+      .notNull()
+      .references(() => skillReleases.id, { onDelete: "restrict" }),
+    createdByAccountId: text("created_by_account_id").references(
+      () => accounts.id,
+      { onDelete: "set null" },
+    ),
+    name: text("name").notNull(),
+    revision: integer("revision").notNull().default(1),
+    parameters: text("parameters", { mode: "json" }).$type<JsonObject>().notNull(),
+    configDigest: text("config_digest").notNull(),
+    status: text("status", { enum: ["active", "archived"] })
+      .notNull()
+      .default("active"),
+    ...timestamps,
+    archivedAt: text("archived_at"),
+  },
+  (table) => [
+    uniqueIndex("personal_configs_workspace_digest_uq").on(
+      table.workspaceId,
+      table.configDigest,
+    ),
+    index("personal_configs_workspace_status_idx").on(table.workspaceId, table.status),
+    index("personal_configs_release_idx").on(table.skillReleaseId),
+  ],
+);
+
+export const skillForks = sqliteTable(
+  "skill_forks",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    sourceSkillId: text("source_skill_id")
+      .notNull()
+      .references(() => skills.id, { onDelete: "restrict" }),
+    sourceReleaseId: text("source_release_id")
+      .notNull()
+      .references(() => skillReleases.id, { onDelete: "restrict" }),
+    forkedSkillId: text("forked_skill_id")
+      .notNull()
+      .references(() => skills.id, { onDelete: "cascade" }),
+    forkedReleaseId: text("forked_release_id").references(() => skillReleases.id, {
+      onDelete: "set null",
+    }),
+    createdByAccountId: text("created_by_account_id").references(
+      () => accounts.id,
+      { onDelete: "set null" },
+    ),
+    reason: text("reason").notNull().default(""),
+    structuredDiff: text("structured_diff", { mode: "json" })
+      .$type<JsonValue>()
+      .notNull(),
+    status: text("status", { enum: ["draft", "tested", "published", "archived"] })
+      .notNull()
+      .default("draft"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("skill_forks_forked_skill_uq").on(table.forkedSkillId),
+    index("skill_forks_source_release_idx").on(table.sourceReleaseId),
+    index("skill_forks_workspace_status_idx").on(table.workspaceId, table.status),
+  ],
+);
+
+export const connections = sqliteTable(
+  "connections",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    accountId: text("account_id").references(() => accounts.id, {
+      onDelete: "set null",
+    }),
+    provider: text("provider", { enum: ["feishu_cn", "jira_cloud", "custom"] })
+      .notNull(),
+    providerAccountId: text("provider_account_id"),
+    displayName: text("display_name").notNull(),
+    status: text("status", {
+      enum: ["pending", "active", "expired", "error", "revoked"],
+    })
+      .notNull()
+      .default("pending"),
+    authScheme: text("auth_scheme", {
+      enum: ["oauth2", "api_token", "service_account"],
+    }).notNull(),
+    secretRef: text("secret_ref").notNull(),
+    grantedScopes: text("granted_scopes", { mode: "json" })
+      .$type<string[]>()
+      .notNull(),
+    selectedResources: text("selected_resources", { mode: "json" })
+      .$type<JsonValue>()
+      .notNull(),
+    dataRegion: text("data_region").notNull().default("global"),
+    metadata: text("metadata", { mode: "json" }).$type<JsonObject>(),
+    tokenExpiresAt: text("token_expires_at"),
+    lastUsedAt: text("last_used_at"),
+    ...timestamps,
+    revokedAt: text("revoked_at"),
+  },
+  (table) => [
+    index("connections_workspace_provider_idx").on(table.workspaceId, table.provider),
+    index("connections_workspace_status_idx").on(table.workspaceId, table.status),
+    index("connections_account_status_idx").on(table.accountId, table.status),
+    index("connections_token_expiry_idx").on(table.status, table.tokenExpiresAt),
+  ],
+);
+
+export const capabilityGrants = sqliteTable(
+  "capability_grants",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    connectionId: text("connection_id")
+      .notNull()
+      .references(() => connections.id, { onDelete: "cascade" }),
+    capability: text("capability").notNull(),
+    effect: text("effect", { enum: ["read", "create", "update", "delete", "send"] })
+      .notNull(),
+    resourceType: text("resource_type"),
+    resourceId: text("resource_id"),
+    approvalPolicy: text("approval_policy", {
+      enum: ["never", "first_use", "always"],
+    })
+      .notNull()
+      .default("always"),
+    constraints: text("constraints", { mode: "json" }).$type<JsonObject>(),
+    status: text("status", { enum: ["active", "expired", "revoked"] })
+      .notNull()
+      .default("active"),
+    grantedByAccountId: text("granted_by_account_id").references(
+      () => accounts.id,
+      { onDelete: "set null" },
+    ),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    expiresAt: text("expires_at"),
+    revokedAt: text("revoked_at"),
+  },
+  (table) => [
+    uniqueIndex("capability_grants_connection_scope_uq").on(
+      table.connectionId,
+      table.capability,
+      table.effect,
+      table.resourceType,
+      table.resourceId,
+    ),
+    index("capability_grants_workspace_status_idx").on(table.workspaceId, table.status),
+    index("capability_grants_connection_status_idx").on(table.connectionId, table.status),
+    index("capability_grants_capability_idx").on(table.capability, table.effect),
+  ],
+);
+
+export const runs = sqliteTable(
+  "runs",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    initiatedByAccountId: text("initiated_by_account_id").references(
+      () => accounts.id,
+      { onDelete: "set null" },
+    ),
+    workflowVersionId: text("workflow_version_id").references(
+      () => workflowVersions.id,
+      { onDelete: "restrict" },
+    ),
+    skillReleaseId: text("skill_release_id").references(() => skillReleases.id, {
+      onDelete: "restrict",
+    }),
+    personalConfigurationId: text("personal_configuration_id").references(
+      () => personalConfigurations.id,
+      { onDelete: "set null" },
+    ),
+    kind: text("kind", { enum: ["official_sample", "private"] })
+      .notNull()
+      .default("private"),
+    status: text("status", {
+      enum: [
+        "queued",
+        "running",
+        "waiting_approval",
+        "succeeded",
+        "failed",
+        "cancelled",
+        "blocked",
+      ],
+    })
+      .notNull()
+      .default("queued"),
+    idempotencyKey: text("idempotency_key"),
+    input: text("input", { mode: "json" }).$type<JsonValue>().notNull(),
+    output: text("output", { mode: "json" }).$type<JsonValue>(),
+    error: text("error", { mode: "json" }).$type<JsonObject>(),
+    runtimePolicy: text("runtime_policy", { mode: "json" })
+      .$type<JsonObject>()
+      .notNull(),
+    modelProvider: text("model_provider"),
+    modelId: text("model_id"),
+    executionRegion: text("execution_region").notNull().default("global"),
+    crossBorderProcessingUsed: integer("cross_border_processing_used", {
+      mode: "boolean",
+    })
+      .notNull()
+      .default(false),
+    tokenInput: integer("token_input").notNull().default(0),
+    tokenOutput: integer("token_output").notNull().default(0),
+    costMicros: integer("cost_micros").notNull().default(0),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    startedAt: text("started_at"),
+    completedAt: text("completed_at"),
+  },
+  (table) => [
+    uniqueIndex("runs_workspace_idempotency_uq").on(
+      table.workspaceId,
+      table.idempotencyKey,
+    ),
+    index("runs_workspace_status_created_idx").on(
+      table.workspaceId,
+      table.status,
+      table.createdAt,
+    ),
+    index("runs_workflow_version_idx").on(table.workflowVersionId),
+    index("runs_skill_release_idx").on(table.skillReleaseId),
+    index("runs_status_created_idx").on(table.status, table.createdAt),
+  ],
+);
+
+export const runSteps = sqliteTable(
+  "run_steps",
+  {
+    id: text("id").primaryKey(),
+    runId: text("run_id")
+      .notNull()
+      .references(() => runs.id, { onDelete: "cascade" }),
+    workflowNodeId: text("workflow_node_id").references(() => workflowNodes.id, {
+      onDelete: "set null",
+    }),
+    sequence: integer("sequence").notNull(),
+    attempt: integer("attempt").notNull().default(1),
+    kind: text("kind").notNull(),
+    name: text("name").notNull(),
+    status: text("status", {
+      enum: [
+        "queued",
+        "running",
+        "waiting_approval",
+        "succeeded",
+        "failed",
+        "skipped",
+        "cancelled",
+        "blocked",
+      ],
+    })
+      .notNull()
+      .default("queued"),
+    input: text("input", { mode: "json" }).$type<JsonValue>(),
+    output: text("output", { mode: "json" }).$type<JsonValue>(),
+    error: text("error", { mode: "json" }).$type<JsonObject>(),
+    capability: text("capability"),
+    connectionId: text("connection_id").references(() => connections.id, {
+      onDelete: "set null",
+    }),
+    requiresApproval: integer("requires_approval", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    sideEffect: text("side_effect", {
+      enum: ["none", "read", "create", "update", "delete", "send"],
+    })
+      .notNull()
+      .default("none"),
+    startedAt: text("started_at"),
+    completedAt: text("completed_at"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("run_steps_run_sequence_attempt_uq").on(
+      table.runId,
+      table.sequence,
+      table.attempt,
+    ),
+    index("run_steps_run_status_idx").on(table.runId, table.status),
+    index("run_steps_connection_idx").on(table.connectionId),
+    index("run_steps_capability_idx").on(table.capability),
+  ],
+);
+
+export const artifacts = sqliteTable(
+  "artifacts",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    runId: text("run_id").references(() => runs.id, { onDelete: "set null" }),
+    runStepId: text("run_step_id").references(() => runSteps.id, {
+      onDelete: "set null",
+    }),
+    kind: text("kind", { enum: ["input", "intermediate", "output", "receipt"] })
+      .notNull(),
+    name: text("name").notNull(),
+    mimeType: text("mime_type").notNull(),
+    storageKey: text("storage_key").notNull(),
+    byteSize: integer("byte_size").notNull(),
+    contentDigest: text("content_digest").notNull(),
+    dataRegion: text("data_region").notNull().default("global"),
+    metadata: text("metadata", { mode: "json" }).$type<JsonObject>(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    expiresAt: text("expires_at"),
+    deletedAt: text("deleted_at"),
+  },
+  (table) => [
+    uniqueIndex("artifacts_workspace_storage_key_uq").on(
+      table.workspaceId,
+      table.storageKey,
+    ),
+    index("artifacts_run_kind_idx").on(table.runId, table.kind),
+    index("artifacts_workspace_created_idx").on(table.workspaceId, table.createdAt),
+    index("artifacts_expiry_idx").on(table.deletedAt, table.expiresAt),
+  ],
+);
+
+export const approvals = sqliteTable(
+  "approvals",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    runId: text("run_id")
+      .notNull()
+      .references(() => runs.id, { onDelete: "cascade" }),
+    runStepId: text("run_step_id").references(() => runSteps.id, {
+      onDelete: "cascade",
+    }),
+    actionType: text("action_type").notNull(),
+    actionPayload: text("action_payload", { mode: "json" })
+      .$type<JsonObject>()
+      .notNull(),
+    riskLevel: text("risk_level", { enum: ["low", "medium", "high", "critical"] })
+      .notNull()
+      .default("medium"),
+    status: text("status", {
+      enum: ["pending", "approved", "denied", "expired", "cancelled"],
+    })
+      .notNull()
+      .default("pending"),
+    requestedByType: text("requested_by_type", { enum: ["system", "agent", "user"] })
+      .notNull()
+      .default("agent"),
+    requestedById: text("requested_by_id"),
+    decidedByAccountId: text("decided_by_account_id").references(
+      () => accounts.id,
+      { onDelete: "set null" },
+    ),
+    decisionReason: text("decision_reason"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    expiresAt: text("expires_at"),
+    decidedAt: text("decided_at"),
+  },
+  (table) => [
+    index("approvals_workspace_status_idx").on(table.workspaceId, table.status),
+    index("approvals_run_status_idx").on(table.runId, table.status),
+    index("approvals_pending_expiry_idx").on(table.status, table.expiresAt),
+  ],
+);
+
+export const auditEvents = sqliteTable(
+  "audit_events",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id").references(() => workspaces.id, {
+      onDelete: "set null",
+    }),
+    actorType: text("actor_type", {
+      enum: ["system", "account", "agent", "connector", "worker"],
+    }).notNull(),
+    actorId: text("actor_id"),
+    action: text("action").notNull(),
+    objectType: text("object_type").notNull(),
+    objectId: text("object_id").notNull(),
+    runId: text("run_id").references(() => runs.id, { onDelete: "set null" }),
+    policyVersion: text("policy_version"),
+    beforeDigest: text("before_digest"),
+    afterDigest: text("after_digest"),
+    dataRegion: text("data_region").notNull().default("global"),
+    eventData: text("event_data", { mode: "json" }).$type<JsonObject>(),
+    requestId: text("request_id"),
+    ipHash: text("ip_hash"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("audit_events_workspace_created_idx").on(table.workspaceId, table.createdAt),
+    index("audit_events_object_created_idx").on(
+      table.objectType,
+      table.objectId,
+      table.createdAt,
+    ),
+    index("audit_events_run_created_idx").on(table.runId, table.createdAt),
+    index("audit_events_action_created_idx").on(table.action, table.createdAt),
+    index("audit_events_request_idx").on(table.requestId),
+  ],
+);
+
+export type Account = typeof accounts.$inferSelect;
+export type NewAccount = typeof accounts.$inferInsert;
+export type Workspace = typeof workspaces.$inferSelect;
+export type NewWorkspace = typeof workspaces.$inferInsert;
+export type Membership = typeof memberships.$inferSelect;
+export type Skill = typeof skills.$inferSelect;
+export type SkillRelease = typeof skillReleases.$inferSelect;
+export type Workflow = typeof workflows.$inferSelect;
+export type WorkflowVersion = typeof workflowVersions.$inferSelect;
+export type WorkflowNode = typeof workflowNodes.$inferSelect;
+export type WorkflowEdge = typeof workflowEdges.$inferSelect;
+export type PersonalConfiguration = typeof personalConfigurations.$inferSelect;
+export type SkillFork = typeof skillForks.$inferSelect;
+export type Connection = typeof connections.$inferSelect;
+export type CapabilityGrant = typeof capabilityGrants.$inferSelect;
+export type Run = typeof runs.$inferSelect;
+export type RunStep = typeof runSteps.$inferSelect;
+export type Artifact = typeof artifacts.$inferSelect;
+export type Approval = typeof approvals.$inferSelect;
+export type AuditEvent = typeof auditEvents.$inferSelect;

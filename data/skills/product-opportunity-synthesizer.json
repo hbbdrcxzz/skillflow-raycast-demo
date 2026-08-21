@@ -1,0 +1,114 @@
+{
+  "manifest_version": "1.0.0",
+  "skill": {
+    "id": "skl_product_opportunity_synthesizer",
+    "slug": "product-opportunity-synthesizer",
+    "name_zh": "产品机会综合判断",
+    "summary_zh": "把已确认的用户研究主题转成有证据、假设和反转条件的产品机会草案。",
+    "domain": "internet-product-operations",
+    "status": "draft",
+    "source_type": "platform-example",
+    "source_status": "example-only",
+    "author": {"display_name": "Skillflow 产品示例（占位）", "status": "example-placeholder", "source_url": null},
+    "tags": ["产品机会", "用户洞察", "假设", "证据", "决策"]
+  },
+  "task": {
+    "definition_zh": "结合用户研究主题、业务背景和约束，提出问题机会而非直接跳到功能方案，并明确证据强弱与待验证假设。",
+    "jobs_to_be_done_zh": "当研究主题已被人工确认后，产品经理希望得到可进入方案讨论的机会清单，同时知道哪些判断可能反转。",
+    "applies_when_zh": ["主题已经绑定证据和反例", "业务目标与约束已提供", "用户需要产品机会草案而非最终立项结论"],
+    "not_for_zh": ["代替负责人做最终立项决策", "仅凭单一访谈估算市场规模", "生成没有证据的功能清单", "财务、合规或安全高风险决策"],
+    "success_criteria_zh": ["每个机会绑定主题和证据", "区分事实、解释和假设", "给出不做的代价与反转条件", "明确下一步验证动作"],
+    "assumptions_zh": ["主题已由研究负责人确认", "业务目标和边界不是空白"]
+  },
+  "node": {
+    "type": "ai-cognitive",
+    "cognitive_fit": "high",
+    "autonomy_risk": "high",
+    "recommended_execution_mode": "ai-draft-human-approve",
+    "human_gate_zh": "产品负责人必须确认机会定义、证据边界和验证优先级。"
+  },
+  "contracts": {
+    "input_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["business_goal", "themes"],
+      "properties": {
+        "business_goal": {"type": "string"},
+        "product_context": {"type": "string"},
+        "constraints": {"type": "array", "items": {"type": "string"}},
+        "themes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["theme_id", "statement", "supporting_evidence_ids", "counter_evidence_ids", "strength"],
+            "properties": {
+              "theme_id": {"type": "string"},
+              "statement": {"type": "string"},
+              "supporting_evidence_ids": {"type": "array", "items": {"type": "string"}},
+              "counter_evidence_ids": {"type": "array", "items": {"type": "string"}},
+              "strength": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "output_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["opportunities", "portfolio_limitations"],
+      "properties": {
+        "opportunities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["opportunity_id", "user_problem", "desired_outcome", "evidence_ids", "assumptions", "reversal_conditions", "next_validation", "confidence"],
+            "properties": {
+              "opportunity_id": {"type": "string"},
+              "user_problem": {"type": "string"},
+              "desired_outcome": {"type": "string"},
+              "evidence_ids": {"type": "array", "items": {"type": "string"}},
+              "assumptions": {"type": "array", "items": {"type": "string"}},
+              "reversal_conditions": {"type": "array", "items": {"type": "string"}},
+              "next_validation": {"type": "array", "items": {"type": "string"}},
+              "confidence": {"type": "string", "enum": ["low", "medium", "high"]}
+            }
+          }
+        },
+        "portfolio_limitations": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  },
+  "permissions": {"risk_level": "medium", "read": ["经确认的研究主题、证据引用和业务背景"], "write": ["本次运行的产品机会草案"], "network": {"mode": "none", "allowlist": []}, "credentials": [], "external_actions": [], "requires_per_run_confirmation": false},
+  "connectors": {"required": [], "optional": []},
+  "region_data_policy": {
+    "default_processing_region": "CN",
+    "allowed_processing_regions": ["CN"],
+    "foreign_model_policy": {"allowed": true, "requires_explicit_consent": true, "disclosure_zh": "选择境外模型时须告知研究主题、业务背景和证据摘要的发送范围。"},
+    "data_classes_allowed": ["一般内部产品资料", "匿名化用户研究证据"],
+    "data_classes_blocked": ["国家秘密", "未获授权的敏感个人信息"],
+    "retention": {"unsaved_input_hours": 24, "temporary_output_hours": 24, "saved_asset_policy_zh": "保存后随工作流版本保留至用户删除。"},
+    "training_policy_zh": "用户材料不得用于公共模型训练。"
+  },
+  "execution": {"class": "instruction-only", "runtime": "skillflow-cn-sandbox", "timeout_seconds": 300, "max_retries": 1, "sandbox_required": true, "side_effects": ["生成产品机会草案"], "human_gate": "required-before-downstream"},
+  "evidence": {"current_level": "E0", "target_level_before_recommendation": "E2", "claims_zh": ["当前为平台示例，尚未验证机会判断与人工判断的一致性。"], "records": []},
+  "license": {"declared_license": null, "source_status": "example-placeholder", "internal_tier": "L0_EXAMPLE_ONLY", "commercial_use_status": "blocked-until-verified", "notice_zh": "平台示例清单；作者与许可证待确认。"},
+  "versioning": {"current_version": "0.1.0", "versions": [{"version": "0.1.0", "status": "draft", "content_hash": null, "breaking_change": false, "changes_zh": ["建立机会、假设和反转条件契约"]}]},
+  "evaluations": {
+    "cases": [
+      {"id": "eval_opportunity_from_evidence", "name_zh": "从证据形成问题机会", "status": "planned", "fixture_zh": "三个重复主题和一个争议主题，包含明确业务约束", "assertions_zh": ["不直接跳成功能", "每个机会绑定证据", "争议主题降低置信度"], "required_evidence_level": "E2", "last_result": null},
+      {"id": "eval_weak_evidence_boundary", "name_zh": "弱证据边界", "status": "planned", "fixture_zh": "仅有一个单例主题且缺少业务目标", "assertions_zh": ["不输出高置信机会", "明确材料不足", "要求补充业务目标或验证"], "required_evidence_level": "E2", "last_result": null}
+    ]
+  },
+  "failure_policy": {"known_failures_zh": ["把解决方案当问题", "夸大弱证据", "忽略业务约束", "反转条件空泛"], "retry_on_zh": ["输出未通过 Schema"], "stop_on_zh": ["主题没有证据引用", "缺少业务目标"], "fallback_zh": ["只输出问题陈述和待验证假设", "转人工机会工作坊"], "allow_partial_result": true},
+  "personalization": {
+    "mode": "overlay",
+    "fields": [
+      {"key": "opportunity_horizon", "label_zh": "机会时间范围", "type": "string", "default": "季度", "allowed_values": ["本月", "季度", "半年", "长期探索"], "affects": ["机会范围"], "requires_new_skill_version": false},
+      {"key": "max_opportunities", "label_zh": "最多机会数", "type": "integer", "default": 5, "affects": ["输出数量"], "requires_new_skill_version": false},
+      {"key": "risk_posture", "label_zh": "判断风格", "type": "string", "default": "证据保守", "allowed_values": ["证据保守", "平衡", "探索优先"], "affects": ["置信度和验证建议"], "requires_new_skill_version": false}
+    ]
+  }
+}
