@@ -18,6 +18,7 @@
 - Implemented controlled task compilation, structural workflow validation, system-boundary API, identity-aware Personal Workspace bootstrap, and D1/R2 hosting bindings.
 - Added an interactive Node Audit panel to the existing Workflow Lab, including AI verdict, human responsibility, I/O contract, evidence level, permissions, and acceptance checks.
 - Replaced placeholder 92% claims with E0/candidate language and clearly labeled prebuilt sample results.
+- Published the Phase 1 foundation to the existing private Skillflow URL, including the Node Audit UI, controlled compiler APIs, Skill registry, and provisioned D1/R2 bindings.
 
 ### Test Results
 | Test | Expected | Actual | Status |
@@ -27,7 +28,7 @@
 | Private Sites deployment | Online interaction demo available | Deployment succeeded | pass |
 | Phase 1 lint | No lint errors across application, contracts, schema, manifests, and tests | Passed | pass |
 | Phase 1 production build | All UI and API routes compile for Vinext/Workers | Passed; 5 API routes emitted | pass |
-| Workflow behavior tests | Single-Skill path, controlled workflow path, and high-risk approval boundary | 3/3 passed | pass |
+| Workflow behavior tests | Single-Skill path, controlled workflow path, high-risk approval boundary, and honest public registry evidence | 4/4 passed | pass |
 | D1 migration | Creates all tables, indexes, and foreign keys in SQLite | Executed successfully in an in-memory SQLite database | pass |
 
 ### Errors
