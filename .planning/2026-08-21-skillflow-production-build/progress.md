@@ -3,8 +3,8 @@
 ## Session: 2026-08-21
 
 ### Current Status
-- **Phase:** 2 — Controlled Runtime and Golden Workflows
-- **State:** Phase 1 foundation is implemented and verified; the next slice is the controlled official-sample runner and first real model-backed golden workflow.
+- **Phase:** 2–3 overlap — Controlled Runtime plus Real Registry Supply
+- **State:** The shell-only acceptance failure has been corrected locally: real upstream Skill discovery works end to end, and the first model-backed golden workflow is implemented with a human approval gate and downloadable artifact. Production model execution remains intentionally disabled until server-side model credentials are provisioned.
 
 ### Actions Taken
 - Built and published the high-fidelity Skillflow interactive prototype.
@@ -19,6 +19,11 @@
 - Added an interactive Node Audit panel to the existing Workflow Lab, including AI verdict, human responsibility, I/O contract, evidence level, permissions, and acceptance checks.
 - Replaced placeholder 92% claims with E0/candidate language and clearly labeled prebuilt sample results.
 - Published the Phase 1 foundation to the existing private Skillflow URL, including the Node Audit UI, controlled compiler APIs, Skill registry, and provisioned D1/R2 bindings.
+- Audited the current public OpenAgentSkill product across homepage, directory, task catalog, packs, comparison, safety, submission, detail, install, outcome, and Agent API surfaces; converted the audit into an explicit compatibility/enhancement map.
+- Added an upstream-compatible Registry adapter and live product UI for task search, real Skill cards, full trust/safety/permission evidence, author attribution, details, three-way comparison, install-command handoff, and placement into a workflow.
+- Added a server-only OpenAI Responses API gateway with strict JSON Schema outputs, `store: false`, timeout/error mapping, and real provider/model/token receipts. API keys never enter client code or responses.
+- Added one real seven-node product-manager workflow: deterministic normalization, evidence extraction, insight clustering, per-node AI-fit assessment, human theme approval, evidence-backed PRD generation, and deterministic PRD quality checks.
+- Added a real `.txt`/`.md` and pasted-text runner UI. Without a server-side model configuration it refuses to show canned output; with configuration it exposes evidence, AI/human boundaries, approval, PRD, quality score, receipts, and Markdown download.
 
 ### Test Results
 | Test | Expected | Actual | Status |
@@ -30,6 +35,9 @@
 | Phase 1 production build | All UI and API routes compile for Vinext/Workers | Passed; 5 API routes emitted | pass |
 | Workflow behavior tests | Single-Skill path, controlled workflow path, high-risk approval boundary, and honest public registry evidence | 4/4 passed | pass |
 | D1 migration | Creates all tables, indexes, and foreign keys in SQLite | Executed successfully in an in-memory SQLite database | pass |
+| Real public Registry | Search current upstream supply, open details, inspect trust/safety/permissions and install handoff | Verified in the local browser against the live public API | pass |
+| Model-runtime contract | No credentials means explicit refusal; structured model runs produce evidence, workflow assessment, PRD and real receipts | 4 runtime behavior tests plus schema/traceability checks passed | pass |
+| Current full verification | Lint, Vinext/Workers build, and application tests | lint pass; build pass; 8/8 tests pass | pass |
 
 ### Errors
 | Error | Resolution |
@@ -37,3 +45,5 @@
 | Planning initializer lacked executable permission | Invoked via `sh` and completed successfully |
 | Local dev server inspector bind was blocked by the sandbox | Restarted with approved preview permission |
 | Starter test lint used reserved variable name | Renamed the variable and reran lint/tests successfully |
+| Two agents initially created overlapping shallow and full workflow schemas | Made the seven-node runtime Skill definition the unique contract source and imported its instructions, schemas and validators into the server runtime |
+| UI initially assumed the earlier shallow response field names | Aligned the runner with evidence/theme/workflow/PRD fields from the final canonical runtime contract |

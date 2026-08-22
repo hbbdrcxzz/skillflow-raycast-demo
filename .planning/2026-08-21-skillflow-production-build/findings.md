@@ -47,5 +47,12 @@
 - Dark graphite brand stage; warm-light Artifact, permission, and long-reading surfaces.
 
 ## Existing Prototype Status
-- Current online demo validates visual language and interaction direction only.
-- Current page state is client-side and does not persist; no real business API, OAuth, upload, registry, run engine, audit store, or production data-residency guarantee exists yet.
+- The previously deployed version validates visual language and interaction direction only; it should be replaced by the current verified build.
+- The current local build now has a real public Registry adapter and a real model-runtime implementation. Search/detail/compare/install-handoff are usable without a model key. The seven-node private workflow requires `OPENAI_API_KEY` and `OPENAI_MODEL` in the server environment and refuses fake fallback output when they are absent.
+- Persistence, creator submission/claim, outcomes, ranking UI, connector OAuth, arbitrary file parsing beyond `.txt`/`.md`, and the remaining two golden workflows are not complete and must not be described as finished.
+
+## OpenAgentSkill Compatibility Decision
+- Copy functional mechanisms, not the brand, text, visual assets, proprietary ranking formula, or private implementation.
+- Treat OpenAgentSkill as a source-attributed public upstream Registry. A listing is real supply, but it is not automatically a locally reviewed or hosted-runnable Skill.
+- Functional parity is grouped into three states: implemented now (search/detail/trust/compare/install handoff/Agent-shaped APIs), contract/endpoint ready but UI incomplete (resolve/packs), and still pending (rankings/outcomes/submission/claim/creator profiles/text API). This distinction prevents another broad-looking but hollow release.
+- Our durable differentiation remains downstream of discovery: workflow decomposition, node-level AI suitability, Skill combinations, human approval, personalization/Fork, controlled runs, traceable artifacts, and verified outcomes.

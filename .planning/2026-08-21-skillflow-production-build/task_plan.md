@@ -1,7 +1,7 @@
 # Task Plan: Skillflow Production Build
 
 ## Goal
-Build a China-first, production-capable Skill marketplace and workbench for internet product and operations users, with single-Skill discovery, workflow diagnosis, evidence-based node decisions, sandboxed runs, personalization, and three real golden workflows.
+Build a China-first, production-capable Skill marketplace and workbench for internet product and operations users. The acceptance bar is no longer a visual prototype: users must be able to discover real upstream Skills, inspect evidence and install handoffs, place Skills into a diagnosed workflow, run an allowlisted golden workflow against real user material, approve intermediate results, and download a real artifact.
 
 ## Current Phase
 Phase 2 — Controlled Runtime and Golden Workflows
@@ -23,13 +23,17 @@ Phase 2 — Controlled Runtime and Golden Workflows
 - **Status:** complete
 
 ### Phase 2: Controlled Runtime and Golden Workflows
-- [ ] Build a controlled task runner, Model Gateway, Tool Broker, file sandbox, receipts, retry, and partial-success handling
+- [ ] Build a controlled task runner, server-side Model Gateway, Tool Broker, file sandbox, receipts, retry, and partial-success handling
 - [ ] Implement official-sample run and private-user run modes
-- [ ] Implement three golden workflows with fixed evaluation sets
+- [ ] Make the first golden workflow genuinely usable: `.txt`/`.md` or pasted interview material → evidence extraction → insight clustering → human approval → PRD generation → deterministic quality check → Markdown download
+- [ ] Expose the real Skill instructions, model/provider, token usage, timings, warnings, and run receipt; never represent canned output as a completed run
+- [ ] Implement the remaining two golden workflows with fixed evaluation sets only after the first path passes end-to-end acceptance
 - **Status:** in_progress
 
 ### Phase 3: Registry, Import, and Connectors
-- [ ] Implement open-source Skill indexing, license classification, immutable releases, evidence attestations, and compatibility adapters
+- [ ] Add an OpenAgentSkill-compatible upstream registry adapter so the product has real public supply immediately while preserving source attribution
+- [ ] Implement task resolve, search/filter, full Skill detail, trust/safety profile, compare, packs, rankings, install handoff, machine-readable manifest, creator submission/claim state, and outcome feedback
+- [ ] Implement internal license classification, immutable releases, evidence attestations, and compatibility adapters; upstream indexing does not equal local review or runtime approval
 - [ ] Implement file/URL inputs and Feishu connector to the frozen capability boundary
 - [ ] Implement Jira Cloud connector only if included in the frozen MVP boundary
 - **Status:** pending
@@ -39,6 +43,7 @@ Phase 2 — Controlled Runtime and Golden Workflows
 - [ ] Build dual entry: single Skill and AI workflow diagnosis
 - [ ] Build Workflow Lab, Node Inspector, Skill comparison, Outcome Lens, structured Diff, Command Home, and Artifact views
 - [ ] Cover empty, denied, expired, partial-success, outcome-unknown, outdated, and risk states
+- [ ] Preserve the OpenAgentSkill functional loop (discover → inspect → compare → install/enable → report outcome) while extending it with workflow diagnosis, node-level AI decisions, personalization Diff, controlled execution, and artifacts
 - **Status:** pending
 
 ### Phase 5: Evaluation, Security, and Verification
@@ -66,6 +71,7 @@ Phase 2 — Controlled Runtime and Golden Workflows
 | MVP does not execute arbitrary third-party scripts | Keeps hosted execution limited to instruction-only, built-in, and allowlisted capabilities |
 | External/global models and cross-border processing are allowed | User explicitly prioritizes access to external models over mainland-only residency |
 | Feishu CN limited read plus confirmed document creation; Jira Cloud later read-only | Provides a useful end-to-end loop without overwrite, delete, private deployment, or silent external actions |
+| OpenAgentSkill is an upstream-compatible supply source, not a brand/template to clone | Copy the public product mechanisms and API-shaped capability while keeping source attribution, independent visual identity, local review state, and our own workflow/runtime layer |
 
 ## Errors Encountered
 | Error | Resolution |

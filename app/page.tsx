@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { WorkflowPlan } from "@/lib/contracts";
+import RegistryBrowser from "@/app/components/RegistryBrowser";
+import InterviewRunner from "@/app/components/InterviewRunner";
 
-type Stage = "home" | "diagnose" | "routes" | "lens" | "dashboard";
+type Stage = "home" | "catalog" | "diagnose" | "routes" | "runner" | "lens" | "dashboard";
 
 const questions = [
   {
@@ -112,14 +114,14 @@ export default function Home() {
     }
   }
 
-  async function compileCurrentPlan(answerSet: string[]) {
+  async function compileCurrentPlan(answerSet: string[], goalOverride?: string) {
     setCompileState("compiling");
     try {
       const response = await fetch("/api/workflows/diagnose", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          goal: task,
+          goal: goalOverride || task,
           sources: answerSet[0] ? answerSet[0].split(" + ") : ["飞书文档", "Excel"],
           audience: answerSet[1] || "管理层",
           frequency: answerSet[2] || "每周",
@@ -159,6 +161,7 @@ export default function Home() {
         </button>
         <nav className="nav-links" aria-label="主导航">
           <button className={stage === "home" ? "active" : ""} onClick={() => setStage("home")}>发现</button>
+          <button className={stage === "catalog" ? "active" : ""} onClick={() => setStage("catalog")}>Skill 商店</button>
           <button onClick={() => { setStage("routes"); setSelectedRoute(0); }}>工作流</button>
           <button onClick={() => setStage("dashboard")}>我的空间</button>
           <button>创作者中心</button>
@@ -183,7 +186,7 @@ export default function Home() {
             <div className="window-chrome">
               <div className="chrome-dots"><i /><i /><i /></div>
               <span>Skill Command</span>
-              <span className="online"><i /> 12,480 个能力可用</span>
+              <span className="online"><i /> 已连接实时公开 Registry</span>
             </div>
             <form
               className="command-input"
@@ -218,7 +221,7 @@ export default function Home() {
           </section>
 
           <section className="skill-shelf" aria-label="推荐 Skill">
-            <div className="section-heading"><span>正在被使用的 Skill</span><button>打开商店 ↗</button></div>
+            <div className="section-heading"><span>Skillflow 内建黄金工作流</span><button onClick={() => setStage("catalog")}>打开真实 Skill 商店 ↗</button></div>
             <div className="skill-grid">
               {skillShelf.map((skill) => (
                 <button className="skill-tile" key={skill.name} onClick={() => { setSelectedRoute(skill.code === "WR" ? 0 : 1); setStage("routes"); }}>
@@ -239,6 +242,19 @@ export default function Home() {
           </div>
 
           <section className={`product-machine machine-${stage}`}>
+            {stage === "catalog" && (
+              <RegistryBrowser onUseInWorkflow={(skill) => {
+                const nextTask = `把 ${skill.name} 适配到我的工作流`;
+                setTask(nextTask);
+                setSelectedRoute(0);
+                setToast(`已选择 ${skill.name}，下一步确认它在工作流中的职责`);
+                setStage("routes");
+                void compileCurrentPlan([], nextTask);
+              }} />
+            )}
+
+            {stage === "runner" && <InterviewRunner onBack={() => setStage("routes")} />}
+
             {stage === "diagnose" && (
               <div className="diagnose-layout stage-enter">
                 <div className="diagnose-main">
@@ -362,7 +378,7 @@ export default function Home() {
                   </div>
                   <div className="route-actions">
                     <button className="ghost" onClick={() => setToast("已保存为候选组合")}>保存组合</button>
-                    <button className="primary" onClick={() => setStage("lens")}>查看官方样例 <span>↗</span></button>
+                    <button className="primary" onClick={() => setStage(selectedRoute === 1 ? "runner" : "lens")}>{selectedRoute === 1 ? "上传材料并真实运行" : "查看官方样例"} <span>↗</span></button>
                   </div>
                 </div>
               </div>
