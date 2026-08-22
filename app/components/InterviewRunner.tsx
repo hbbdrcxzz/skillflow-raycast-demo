@@ -114,7 +114,7 @@ export default function InterviewRunner({ onBack }: { onBack: () => void }) {
   return (
     <div className="runner-shell stage-enter">
       <div className="runner-top"><button onClick={onBack}>← 返回能力路径</button><div><span className="live-dot" /> 真实受控运行</div><small>不会执行任意第三方脚本</small></div>
-      <div className="runner-head"><div><div className="micro-label">黄金工作流 01 · 互联网产品</div><h2>访谈原文进入，证据与 PRD 出来。</h2><p>模型只在两个分析节点与一个生成节点工作；主题确认、需求优先级和最终采用仍由人负责。</p></div><div className="runner-flow"><span>标准化</span><i>→</i><span>证据</span><i>→</i><span>洞察</span><i>→</i><b>人确认</b><i>→</i><span>PRD</span></div></div>
+      <div className="runner-head"><div><div className="micro-label">黄金工作流 01 · 互联网产品 · 7 个真实节点</div><h2>访谈原文进入，证据与 PRD 出来。</h2><p>模型负责证据提取、洞察聚类、逐节点 AI 适配判断和 PRD 初稿；材料标准化、人工主题批准与质量检查分别由确定性规则和人负责。</p></div><div className="runner-flow"><span>标准化</span><i>→</i><span>证据</span><i>→</i><span>洞察</span><i>→</i><span>AI 适配</span><i>→</i><b>人确认</b><i>→</i><span>PRD</span><i>→</i><span>质检</span></div></div>
 
       <div className="runner-grid">
         <section className="runner-input-panel">
@@ -122,7 +122,7 @@ export default function InterviewRunner({ onBack }: { onBack: () => void }) {
           <label>产品背景<input value={productContext} onChange={(event) => setProductContext(event.target.value)} maxLength={4000} /></label>
           <div className="file-row"><span><strong>{fileName}</strong><small>{transcript.length.toLocaleString()} 字符 · 浏览器本地读取</small></span><button onClick={() => fileRef.current?.click()}>选择 .txt / .md</button><input ref={fileRef} hidden type="file" accept=".txt,.md,text/plain,text/markdown" onChange={(event) => void readFile(event.target.files?.[0])} /></div>
           <label>访谈原文<textarea value={transcript} onChange={(event) => { setTranscript(event.target.value); setFileName("手动粘贴"); }} /></label>
-          <button className="runner-run" disabled={status !== "idle" || transcript.trim().length < 80} onClick={() => void runAnalysis()}>{status === "analyzing" ? "真实模型正在提取证据…" : analysis ? "重新运行分析" : "运行 3 个受控节点 ↗"}</button>
+          <button className="runner-run" disabled={status !== "idle" || transcript.trim().length < 80} onClick={() => void runAnalysis()}>{status === "analyzing" ? "正在运行证据、洞察与 AI 适配 Skill…" : analysis ? "重新运行 4 个分析节点" : "运行 4 个分析节点 ↗"}</button>
           <p className="runner-privacy">输入会发给服务端配置的外部模型处理；运行请求设置为不存储。页面不会接收或显示模型密钥。</p>
         </section>
 
