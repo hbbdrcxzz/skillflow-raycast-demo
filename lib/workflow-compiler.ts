@@ -15,6 +15,14 @@ type DiagnoseInput = {
   audience?: string;
   frequency?: string;
   targetUser?: string;
+  selectedSkill?: {
+    slug: string;
+    name: string;
+    description?: string;
+    sourceUrl?: string;
+    safetyLabel?: string;
+    permissionLabels?: string[];
+  };
 };
 
 const qualityAssertions: AcceptanceAssertion[] = [
@@ -38,12 +46,12 @@ function baseContract(input: DiagnoseInput, expectedOutput: string): TaskContrac
   return {
     goal: input.goal.trim(),
     targetUser: input.targetUser || "互联网产品 / 运营",
-    trigger: input.frequency === "只做一次" ? "手动启动" : input.frequency || "每周",
-    inputSources: input.sources?.length ? input.sources : ["用户提供的文档或表格"],
+    trigger: input.frequency === "只做一次" ? "手动启动" : input.frequency || "触发方式待确认",
+    inputSources: input.sources?.length ? input.sources : ["输入来源待确认"],
     expectedOutput,
     successCriteria: ["结果结构完整", "关键判断有来源", "外部动作前由用户确认"],
-    frequency: input.frequency || "每周",
-    audience: input.audience || "管理层",
+    frequency: input.frequency || "频率待确认",
+    audience: input.audience || "结果受众待确认",
     exclusions: ["不自动删除或覆盖原始内容", "不静默发送到外部渠道"],
     dataPolicy: "global_allowed",
   };
@@ -51,6 +59,22 @@ function baseContract(input: DiagnoseInput, expectedOutput: string): TaskContrac
 
 function edge(from: string, to: string, contract: string): WorkflowEdge {
   return { id: `${from}-${to}`, from, to, contract, failureRoute: "停止并保留已完成结果" };
+}
+
+function validatedPlan(plan: WorkflowPlan) {
+  const validation = validateWorkflowPlan(plan);
+  if (!validation.valid) throw new Error(validation.errors.join("；"));
+  return plan;
+}
+
+function safeExternalUrl(value?: string) {
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function interviewPlan(input: DiagnoseInput): WorkflowPlan {
@@ -254,9 +278,101 @@ function weeklyReportPlan(input: DiagnoseInput): WorkflowPlan {
   };
 }
 
+function selectedRegistrySkillPlan(input: DiagnoseInput): WorkflowPlan {
+  const selected = input.selectedSkill;
+  if (!selected) throw new Error("缺少已选择的 Skill");
+  const slug = selected.slug.trim();
+  const name = selected.name.trim();
+  if (!/^[a-z0-9][a-z0-9-]{0,119}$/.test(slug) || !name) {
+    throw new Error("已选择的 Skill 标识无效");
+  }
+
+  const skillNode: WorkflowNodePlan = {
+    id: `registry-${slug}`,
+    label: name,
+    purpose: selected.description?.trim() || `使用已选择的 ${name} 完成当前任务。`,
+    kind: "human_decision",
+    executionMode: "human_only",
+    aiFit: 0,
+    autonomyRisk: "medium",
+    aiVerdict: "这是你从真实公开 Registry 主动选择的候选；平台尚未完成本地运行评测，因此不会把它包装成已验证的 AI 自动化方案。",
+    humanResponsibility: "查看原作者说明、权限与安装交接，确认该 Skill 是否适合当前任务。",
+    skillReleaseId: null,
+    skillName: name,
+    score: null,
+    evidenceLevel: null,
+    permissions: noPermission,
+    inputs: ["输入待根据作者说明确认"],
+    outputs: ["输出待根据作者说明确认"],
+    acceptance: [{ id: "upstream-reviewed", label: "已阅读原始说明、权限提示和安装交接", kind: "human", required: true }],
+    fallback: "返回 Skill 商店比较其他候选，或改由 AI 分析完整工作流。",
+    locked: false,
+  };
+
+  return {
+    id: `plan_${crypto.randomUUID()}`,
+    templateId: `registry-single-${slug}`,
+    title: `已选择 ${name}`,
+    summary: "先保留为单 Skill 候选，不强行拆成多节点，也不声称平台已经托管运行。",
+    state: "needs_configuration",
+    recommendation: "single_skill",
+    taskContract: baseContract(input, "输出待根据作者说明确认"),
+    nodes: [skillNode],
+    edges: [],
+    unresolvedQuestions: ["运行前需要根据原作者说明确认输入、输出、兼容平台与权限范围。"],
+    version: 1,
+    generatedAt: new Date().toISOString(),
+    candidateSkill: {
+      slug,
+      name,
+      sourceUrl: safeExternalUrl(selected.sourceUrl),
+      safetyLabel: selected.safetyLabel,
+    },
+  };
+}
+
+function clarificationPlan(input: DiagnoseInput): WorkflowPlan {
+  return {
+    id: `plan_${crypto.randomUUID()}`,
+    templateId: "clarify-task-boundary-v1",
+    title: "还需要确认任务边界",
+    summary: "当前描述不足以可靠匹配 Skill。平台不会把未知任务自动套进周报或访谈模板。",
+    state: "clarifying",
+    recommendation: "workflow",
+    taskContract: baseContract(input, "待确认"),
+    nodes: [{
+      id: "clarify-task",
+      label: "补充目标、输入与验收标准",
+      purpose: "确认真正要完成的工作，再判断一个 Skill 是否足够或需要组合。",
+      kind: "human_decision",
+      executionMode: "human_only",
+      aiFit: 0,
+      autonomyRisk: "low",
+      aiVerdict: "信息不足时继续猜测会造成错误匹配，因此先停在澄清状态。",
+      humanResponsibility: "补充现有做法、可用资料、期望结果和验收方式。",
+      skillReleaseId: null,
+      skillName: null,
+      score: null,
+      evidenceLevel: null,
+      permissions: noPermission,
+      inputs: ["自然语言任务描述"],
+      outputs: ["可执行的任务合同"],
+      acceptance: [{ id: "contract-confirmed", label: "用户确认目标、输入、输出与边界", kind: "human", required: true }],
+      fallback: "返回首页继续描述任务，或直接进入 Skill 商店搜索。",
+      locked: false,
+    }],
+    edges: [],
+    unresolvedQuestions: ["你现在怎样完成这项工作？", "可用资料在哪里？", "什么结果算完成？"],
+    version: 1,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
 export function compileWorkflow(input: DiagnoseInput): WorkflowPlan {
   const goal = input.goal.trim();
   if (!goal) throw new Error("请先描述你希望完成的工作");
-  if (/访谈|用户反馈|用户研究|PRD|需求洞察/i.test(goal)) return interviewPlan(input);
-  return weeklyReportPlan(input);
+  if (input.selectedSkill) return validatedPlan(selectedRegistrySkillPlan(input));
+  if (/访谈|用户反馈|用户研究|PRD|需求洞察/i.test(goal)) return validatedPlan(interviewPlan(input));
+  if (/周报|项目进展|管理层汇报|经营简报/i.test(goal)) return validatedPlan(weeklyReportPlan(input));
+  return validatedPlan(clarificationPlan(input));
 }

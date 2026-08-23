@@ -4,7 +4,7 @@
 Build a China-first, production-capable Skill marketplace and workbench for internet product and operations users. The acceptance bar is no longer a visual prototype: users must be able to discover real upstream Skills, inspect evidence and install handoffs, place Skills into a diagnosed workflow, run an allowlisted golden workflow against real user material, approve intermediate results, and download a real artifact.
 
 ## Current Phase
-Phase 2 — Controlled Runtime and Golden Workflows
+Gate A — Honest Chinese Marketplace (user approval required before Gate B)
 
 ## Phases
 
@@ -40,10 +40,15 @@ Phase 2 — Controlled Runtime and Golden Workflows
 
 ### Phase 4: Product Experience Integration
 - [ ] Convert the current prototype state into persisted production states
+- [ ] Add a cached Chinese presentation/search layer for imported Skills while preserving original names, authorship, repositories, licenses, and source-language fields
 - [ ] Build dual entry: single Skill and AI workflow diagnosis
+- [ ] Replace the fixed three-question wizard with free-form multi-turn diagnosis, adaptive clarification, editable Task Contract, explicit assumptions, and a workflow graph generated from the confirmed contract
 - [ ] Build Workflow Lab, Node Inspector, Skill comparison, Outcome Lens, structured Diff, Command Home, and Artifact views
+- [ ] Make each node editable across two independent dimensions: human/AI execution mode and zero/one/multiple pinned SkillRelease implementations; connect node search, comparison, replacement, split/merge, ordering, and approval points to one WorkflowRevision
 - [ ] Cover empty, denied, expired, partial-success, outcome-unknown, outdated, and risk states
 - [ ] Preserve the OpenAgentSkill functional loop (discover → inspect → compare → install/enable → report outcome) while extending it with workflow diagnosis, node-level AI decisions, personalization Diff, controlled execution, and artifacts
+- [ ] Replace all scripted success/save/version/dashboard claims with persisted backend-driven states; no UI may say “saved”, “run succeeded”, or “personal version” from local demo state alone
+- [ ] Apply the Precision Intelligence design system: Chinese-capable self-hosted type, semantic type/spacing/color/motion tokens, no decision text below 12px, and a desktop conversation–graph–inspector studio layout
 - **Status:** pending
 
 ### Phase 5: Evaluation, Security, and Verification
@@ -79,3 +84,12 @@ Phase 2 — Controlled Runtime and Golden Workflows
 | `init-session.sh` was not executable when called directly | Ran the script explicitly through `sh`; planning files were created successfully |
 | Local preview could not bind its inspector port in the sandbox | Restarted the existing dev command with the approved local-preview permission |
 | Lint rejected a test variable named `module` | Renamed it to `workerBundle`; lint and all tests then passed |
+| Product/visual audit could not inspect the stopped localhost preview and the private URL timed out | Used the user-supplied full-resolution screenshot, current source, tests, deployment records and official product references; did not claim a fresh live walkthrough |
+| One audit-note patch missed the exact markdown context | Re-read the local section and applied a narrower verified patch |
+
+## Audit-Driven Delivery Gates (2026-08-22)
+1. **Gate A — honest Chinese marketplace (in progress):** fix the Registry-to-workflow misrouting, add Chinese briefs/search metadata, full Skill decision fields, and remove scripted save/success claims.
+2. **Gate B — AI work discovery:** free-form conversation, adaptive clarification, editable Task Contract, visible assumptions, and a graph generated from the confirmed contract.
+3. **Gate C — editable Skill composition:** node-level execution mode, real SkillRelease recommendations/replacement/combination, semantic Diff and immutable WorkflowRevision.
+4. **Gate D — one genuine sandbox loop:** preflight, allowlisted run, approval, partial-failure handling, real Artifact/receipt, persistence and reopen from Command Home.
+5. **Gate E — creator foundation:** submit/import/create draft, source/license/safety review, E1/E2 evaluation, immutable release and claim; analytics and one-time paid distribution remain post-traffic work.

@@ -47,3 +47,57 @@
 | Starter test lint used reserved variable name | Renamed the variable and reran lint/tests successfully |
 | Two agents initially created overlapping shallow and full workflow schemas | Made the seven-node runtime Skill definition the unique contract source and imported its instructions, schemas and validators into the server runtime |
 | UI initially assumed the earlier shallow response field names | Aligned the runner with evidence/theme/workflow/PRD fields from the final canonical runtime contract |
+
+## Session: 2026-08-22 — Product/UX Completeness Audit
+
+### Current Status
+- **Phase:** cross-phase acceptance audit before further implementation
+- **State:** Auditing every user-promised capability against current code, deployed behavior and visual evidence. No product code is being changed in this review pass.
+
+### Audit Focus
+- Chinese localization for imported Skill briefs and catalog surfaces.
+- First-principles typography, visual hierarchy, layout density and technology feel.
+- Replacing the rigid workflow questionnaire with conversational diagnosis and editable node-level composition.
+- One-run sandbox experience and honest runtime readiness.
+- Creator-space gap and phased implementation plan.
+
+### Errors
+- The ambient localhost preview was not running (`ERR_CONNECTION_REFUSED`). A follow-up attempt to inspect the private deployed URL exceeded the browser session timeout, so this audit relies on the supplied full-resolution screenshot, current source code, tests and deployment records rather than claiming a fresh live visual walkthrough.
+
+### Verification
+- Re-ran the current production build and all application tests against commit `9d4cde4`: build passed and 8/8 tests passed. This verifies code paths and contracts, not visual quality, production model credentials, creator flow or end-user usability.
+
+### Audit Result
+- Three independent reviews (product acceptance, AI workflow UX, and visual/interaction design) converge on the same diagnosis: technical foundations are materially ahead of the user-facing journey. The current product is a high-fidelity demo with a real Registry and one real runtime implementation, not the complete MVP previously described.
+- Acceptance estimates are explicitly audit judgments rather than user analytics: technical/product foundation roughly 50–60%, current user-facing functional loop roughly 25–35%, and the conversation-to-editable-workflow-to-sandbox-to-save loop roughly 15–30% depending on whether code-only runtime readiness is counted.
+- Delivery gates A–E have been added to `task_plan.md`; no production code changed in this audit turn.
+
+## Session: 2026-08-22 — Gate A Implementation
+
+### Frozen Acceptance Boundary
+- Chinese users can understand every Registry candidate’s function, category, task fit and important risk/permission meaning without depending on the English source description; original name, author, repository, license/source attribution and original description remain inspectable.
+- Direct Skill discovery routes into the Registry, and selecting a real Skill creates a Skill-specific handoff instead of falling through to the weekly-report compiler.
+- No UI claims a draft, run, personal version or recent artifact was saved or completed unless backed by a real persisted/run response.
+- Business and decision text is readable and semantically tiered: no required reading below 12 px, buttons/inputs at least 14 px, Chinese/Latin font use is intentional, and state motion represents actual system activity.
+- Gate A is independently challenged by Red Team and privately deployed for user approval; Gate B does not start without explicit confirmation.
+
+### Implemented
+- Split Registry identity from Chinese presentation: canonical `name/description/category/tags`, author, repository, license and source URLs remain upstream facts; `briefZh/categoryZh/tagsZh` plus localization source/confidence/review metadata form the Chinese decision layer.
+- Added deterministic Chinese task-intent expansion, capability taxonomy, permission/status localization and conservative long-tail fallback. Missing structured use cases, limitations, inputs and outputs now say the upstream did not provide them instead of being invented in the UI.
+- Fixed direct discovery so “match one Skill” opens the real Registry. A selected Registry Skill now carries explicit slug/name/source identity into the compiler and produces `needs_configuration`, never a weekly-report or interview fallback.
+- Added a safe clarification state for unknown free-form tasks. The compiler no longer maps every unknown task to the weekly-report template.
+- Replaced the two hard-coded route diagrams with one graph derived from the same `workflowPlan` used by the node audit and CTA. Registry candidates are explicitly marked “not hosted / not run” and link back to the original source.
+- Removed unsupported saved-draft, saved-combination, personal-version, run-success and recent-history claims; the workspace is an honest empty state until persistence exists.
+- Applied the Precision Intelligence visual system: unified Chinese-capable font stack, semantic size/color/spacing tokens, decision text at least 12 px, controls at least 14 px, reduced decorative motion and stronger hierarchy across Registry, workflow audit, runner, artifact and workspace.
+- Added stage-change scroll restoration so a detail-page scroll position cannot crop the next workflow view.
+
+### Verification
+- `npm run lint`: passed.
+- Production build plus full behavior suite: 14/14 passed.
+- New behavior coverage includes 20 Registry categories preserving selected identity, unknown-task clarification, fake-state source assertions, 10 hostile/incomplete localization fixtures, Chinese intent expansion, canonical fact preservation and runtime anti-hallucination checks.
+- Live browser verification against the real public Registry loaded 16 current candidates, opened Chinese detail plus original source/author links, and handed GPT Researcher/Elasticsearch into a Skill-specific `needs_configuration` plan without a weekly-report fallback.
+- Computed layout checks at 1440, 1024, 720 and 390 px found no horizontal overflow; visible reading text was at least 12 px and visible buttons/inputs at least 14 px after the shortcut correction.
+
+### Awaiting
+- Final Red Team PASS/FAIL and optimality challenge.
+- Private Sites publication of the exact validated commit, followed by user approval before Gate B.

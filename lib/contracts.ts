@@ -120,6 +120,12 @@ export type WorkflowPlan = {
   unresolvedQuestions: string[];
   version: number;
   generatedAt: string;
+  candidateSkill?: {
+    slug: string;
+    name: string;
+    sourceUrl?: string;
+    safetyLabel?: string;
+  };
 };
 
 export type WorkflowValidation = {
@@ -165,4 +171,3 @@ export function validateWorkflowPlan(plan: WorkflowPlan): WorkflowValidation {
 
   return { valid: errors.length === 0, errors, warnings };
 }
-
