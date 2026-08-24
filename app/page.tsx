@@ -12,7 +12,7 @@ type SelectedRegistrySkill = {
   name: string;
   description: string;
   briefZh?: string;
-  safety?: { label?: string; permissionHints?: { label: string }[] };
+  safety?: { label?: string; blocked?: boolean; permissionHints?: { label: string }[] };
   attribution?: { sourceUrl?: string };
 };
 
@@ -53,7 +53,17 @@ export default function Home() {
   const [workflowPlan, setWorkflowPlan] = useState<WorkflowPlan | null>(null);
   const [compileState, setCompileState] = useState<"idle" | "compiling" | "ready" | "error">("idle");
   const [selectedNodeId, setSelectedNodeId] = useState("");
+  const [commandIndex, setCommandIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const commandGroups = useMemo(
+    () => [
+      { icon: "↗", title: "直接开始这项任务", note: task || "描述一项工作", action: "diagnose" as const },
+      { icon: "⌕", title: "匹配一个 Skill", note: "进入真实目录，按任务搜索与比较", action: "catalog" as const },
+      { icon: "✦", title: "帮我发现可交给 AI 的工作", note: "用 3 个问题分析你的重复工作", action: "diagnose" as const },
+    ],
+    [task],
+  );
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -61,16 +71,37 @@ export default function Home() {
         event.preventDefault();
         setStage("home");
         setCommandOpen(true);
+        setCommandIndex(0);
         window.setTimeout(() => inputRef.current?.focus(), 40);
       }
       if (event.key === "Escape") {
         if (stage !== "home") setStage("home");
         else setCommandOpen(false);
       }
+      // 命令面板键盘导航：↑↓ 移动高亮，Enter 执行高亮项（与底部提示一致）。
+      if (stage === "home" && commandOpen && commandGroups.length) {
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          setCommandIndex((index) => (index + 1) % commandGroups.length);
+        }
+        if (event.key === "ArrowUp") {
+          event.preventDefault();
+          setCommandIndex((index) => (index - 1 + commandGroups.length) % commandGroups.length);
+        }
+        if (event.key === "Enter") {
+          event.preventDefault();
+          const target = commandGroups[commandIndex].action;
+          setCommandOpen(false);
+          setQuestionIndex(0);
+          setAnswers([]);
+          setSelectedOption("");
+          setStage(target);
+        }
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [stage]);
+  }, [stage, commandOpen, commandIndex, commandGroups]);
 
   useEffect(() => {
     if (!toast) return;
@@ -83,14 +114,6 @@ export default function Home() {
   }, [stage]);
 
   const activeQuestion = questions[questionIndex];
-  const commandGroups = useMemo(
-    () => [
-      { icon: "↗", title: "直接开始这项任务", note: task || "描述一项工作", action: "diagnose" as const },
-      { icon: "⌕", title: "匹配一个 Skill", note: "进入真实目录，按任务搜索与比较", action: "catalog" as const },
-      { icon: "✦", title: "帮我发现可交给 AI 的工作", note: "用 3 个问题分析你的重复工作", action: "diagnose" as const },
-    ],
-    [task]
-  );
 
   function startFlow(target: "diagnose" | "routes" | "catalog" = "diagnose") {
     setCommandOpen(false);
@@ -134,6 +157,7 @@ export default function Home() {
             description: selectedSkill.briefZh || selectedSkill.description,
             sourceUrl: selectedSkill.attribution?.sourceUrl,
             safetyLabel: selectedSkill.safety?.label,
+            blocked: selectedSkill.safety?.blocked,
             permissionLabels: selectedSkill.safety?.permissionHints?.map((hint) => hint.label) || [],
           } : undefined,
         }),
@@ -212,9 +236,10 @@ export default function Home() {
               <div className="result-label">建议操作</div>
               {commandGroups.map((group, index) => (
                 <button
-                  className="command-row"
+                  className={`command-row ${commandOpen && index === commandIndex ? "active" : ""}`}
                   key={group.title}
                   onClick={() => startFlow(group.action)}
+                  onMouseEnter={() => setCommandIndex(index)}
                 >
                   <span className="command-icon">{group.icon}</span>
                   <span><strong>{group.title}</strong><small>{group.note}</small></span>

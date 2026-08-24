@@ -127,6 +127,47 @@ export function extractRegistrySemanticHints(value: unknown) {
     .slice(0, 32);
 }
 
+// Decision-presentation fields the client consumes from the upstream payload.
+// Everything else in the upstream item stays server-side and is never shipped
+// to the browser through `raw`.
+const rawPresentationWhitelist = [
+  "use_when",
+  "when_to_use",
+  "useWhen",
+  "not_for",
+  "limitations",
+  "notFor",
+  "input",
+  "inputs",
+  "input_description",
+  "output",
+  "outputs",
+  "output_description",
+] as const;
+
+function pickWhitelisted(pool: UnknownRecord): UnknownRecord {
+  const picked: UnknownRecord = {};
+  for (const key of rawPresentationWhitelist) {
+    if (key in pool) picked[key] = pool[key];
+  }
+  return picked;
+}
+
+function trimRawForClient(item: UnknownRecord) {
+  const i18n = record(item.i18n);
+  const zh = record(i18n.zh);
+  const presentation = record(item.presentation);
+  const i18nPicked = pickWhitelisted(i18n);
+  const zhPicked = pickWhitelisted(zh);
+  const presentationPicked = pickWhitelisted(presentation);
+  const raw: UnknownRecord = pickWhitelisted(item);
+  if (Object.keys(i18nPicked).length || Object.keys(zhPicked).length) {
+    raw.i18n = { ...i18nPicked, ...(Object.keys(zhPicked).length ? { zh: zhPicked } : {}) };
+  }
+  if (Object.keys(presentationPicked).length) raw.presentation = presentationPicked;
+  return raw;
+}
+
 export function normalizeRegistrySkill(value: unknown) {
   const item = record(value);
   const author = record(item.author);
@@ -302,7 +343,7 @@ export function normalizeRegistrySkill(value: unknown) {
       url: text(license.url),
       original: item.license ?? null,
     },
-    raw: item,
+    raw: trimRawForClient(item),
   };
 }
 

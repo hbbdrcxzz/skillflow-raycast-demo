@@ -165,7 +165,7 @@ export default function RegistryBrowser({ onUseInWorkflow }: { onUseInWorkflow: 
   }
 
   async function copyCommand(skill: RegistrySkill) {
-    if (!skill.install.command) return;
+    if (!skill.install.command || skill.safety.blocked) return;
     await navigator.clipboard.writeText(skill.install.command);
     setCopied(skill.slug);
     window.setTimeout(() => setCopied(""), 1800);
@@ -241,6 +241,7 @@ export default function RegistryBrowser({ onUseInWorkflow }: { onUseInWorkflow: 
               </button>
               <div className="skill-card-meta">
                 <span>★ {compactNumber(skill.stats.stars)}</span><span>{skill.maintenance.label}</span><span>{skill.safety.label}</span>
+                {skill.safety.blocked && <span className="blocked-badge">已阻断 · 不提供安装交接</span>}
                 <button type="button" className={compare.includes(skill.slug) ? "active" : ""} onClick={() => toggleCompare(skill.slug)}>{compare.includes(skill.slug) ? "已加入比较" : "加入比较"}</button>
               </div>
             </article>
@@ -252,7 +253,7 @@ export default function RegistryBrowser({ onUseInWorkflow }: { onUseInWorkflow: 
             <div className="detail-empty"><span>◇</span><strong>选择一个 Skill 查看完整证据</strong><p>详情包含作者归属、质量、信任、安全、权限提示、安装命令，以及能否放进 Skillflow 托管工作流。</p></div>
           ) : (
             <div className={detailLoading ? "detail-loading" : ""}>
-              <div className="detail-status"><span>{selected.safety.label}</span><em>{selected.attribution.label}</em></div>
+              <div className="detail-status"><span className={selected.safety.blocked ? "blocked" : ""}>{selected.safety.blocked ? "已阻断" : selected.safety.label}</span><em>{selected.attribution.label}</em></div>
               <h3 lang="en">{selected.name}</h3>
               <p className="detail-brief">{selected.briefZh || "中文功能说明待补充。"}</p>
               <div className="detail-tags">{selectedTags.map((tag) => <span key={tag}>{tag}</span>)}</div>
@@ -289,10 +290,19 @@ export default function RegistryBrowser({ onUseInWorkflow }: { onUseInWorkflow: 
               </section>
               <section className="detail-section">
                 <b>安装交接</b>
-                <code>{selected.install.command || "上游未提供安装命令"}</code>
-                <p>MVP 只复制交接命令，不会在服务器上执行第三方脚本。</p>
+                {selected.safety.blocked ? (
+                  <>
+                    <p className="blocked-note">上游安全层已将该 Skill 标记为 blocked（已阻断）。Skillflow 不提供复制安装命令，也不会把它放入工作流。</p>
+                    <code>安装交接已禁用</code>
+                  </>
+                ) : (
+                  <>
+                    <code>{selected.install.command || "上游未提供安装命令"}</code>
+                    <p>MVP 只复制交接命令，不会在服务器上执行第三方脚本。</p>
+                  </>
+                )}
               </section>
-              <div className="detail-actions"><button type="button" disabled={!selected.install.command} onClick={() => void copyCommand(selected)}>{copied === selected.slug ? "已复制" : "复制安装命令"}</button><button type="button" className="primary" onClick={() => onUseInWorkflow(selected)}>放入我的工作流 ↗</button></div>
+              <div className="detail-actions"><button type="button" disabled={!selected.install.command || selected.safety.blocked} onClick={() => void copyCommand(selected)}>{copied === selected.slug ? "已复制" : "复制安装命令"}</button><button type="button" className="primary" disabled={selected.safety.blocked} onClick={() => onUseInWorkflow(selected)}>{selected.safety.blocked ? "已阻断 · 不可放入工作流" : "放入我的工作流 ↗"}</button></div>
               <div className="source-note">
                 <p>{selected.attribution.publicNote || "公开来源已保留原作者、仓库与许可证归属；进入索引不代表已获托管执行授权。"}</p>
                 <p>许可证：{selectedLicenseUrl ? <a href={selectedLicenseUrl} target="_blank" rel="noreferrer">{selected.license?.id || selected.license?.name || "查看许可证说明"}</a> : <span>{selected.license?.id || selected.license?.name ? `${selected.license?.id || selected.license?.name} · 许可证链接待核验` : "上游未提供许可证链接，待核验"}</span>}</p>

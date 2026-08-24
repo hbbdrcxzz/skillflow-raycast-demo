@@ -93,11 +93,12 @@
 
 ### Verification
 - `npm run lint`: passed.
-- Production build plus full behavior suite: 14/14 passed.
-- New behavior coverage includes 20 Registry categories preserving selected identity, unknown-task clarification, fake-state source assertions, 10 hostile/incomplete localization fixtures, Chinese intent expansion, canonical fact preservation and runtime anti-hallucination checks.
-- Live browser verification against the real public Registry loaded 16 current candidates, opened Chinese detail plus original source/author links, and handed GPT Researcher/Elasticsearch into a Skill-specific `needs_configuration` plan without a weekly-report fallback.
-- Computed layout checks at 1440, 1024, 720 and 390 px found no horizontal overflow; visible reading text was at least 12 px and visible buttons/inputs at least 14 px after the shortcut correction.
+- Production build plus full behavior suite: 22/22 passed.
+- New behavior coverage includes 20 Registry categories preserving selected identity, unknown-task clarification, fake-state source assertions, unsafe source-link rejection, complete canonical tags, 10 hostile/incomplete localization fixtures, semantic golden sets for research/RAG/interview/datasets/search infrastructure/decision stress testing/public-opinion analysis, Chinese intent expansion and runtime anti-hallucination checks.
+- Live browser verification against the real public Registry loaded 16 current candidates, opened Chinese detail plus original source/author links, and handed GPT Researcher into a Skill-specific `needs_configuration` plan without a weekly-report fallback or fabricated source/audience/frequency.
+- Real-snapshot localization corrections include Academic Research Skills, Last30days, Interview Guide, Sioyek, ESearch, eight distinct search products, Grill Me/Grill With Docs and BettaFish; canonical source fields remain separate and unknown semantics fall back to “暂无可靠中文说明”.
+- Computed layout checks at 1440, 1024 and 390 px found no horizontal overflow; visible reading text was at least 12 px and visible buttons/inputs at least 14 px. A real 390×844 regression exposed and then verified the fix for clipped horizontal workflow nodes by switching the route to a full-width vertical stack.
 
 ### Awaiting
-- Final Red Team PASS/FAIL and optimality challenge.
-- Private Sites publication of the exact validated commit, followed by user approval before Gate B.
+- Red Team issued PASS after the final canonical-tags correction and kept PASS after the delta-only review of blocked-Skill hardening, runtime configuration honesty, command keyboard navigation and upstream raw-field minimization. No P0/P1 remains in Gate A.
+- Private Sites publication of the exact validated commit, followed by user approval before Gate B. Gate B has not started.

@@ -71,14 +71,15 @@ export class ModelGatewayError extends Error {
   }
 }
 
-function requiredConfiguration() {
+export function modelConfigured(): boolean {
   // Sites/Workers exposes server-side encrypted environment variables to the
   // Node-compatible runtime. This module is never imported by a client file.
   const runtimeEnv = process.env as RuntimeEnvironment;
-  const apiKey = runtimeEnv.OPENAI_API_KEY?.trim();
-  const model = runtimeEnv.OPENAI_MODEL?.trim();
+  return Boolean(runtimeEnv.OPENAI_API_KEY?.trim() && runtimeEnv.OPENAI_MODEL?.trim());
+}
 
-  if (!apiKey || !model) {
+function requiredConfiguration() {
+  if (!modelConfigured()) {
     throw new ModelGatewayError(
       "MODEL_NOT_CONFIGURED",
       "真实模型运行尚未配置。需要在服务端设置 OPENAI_API_KEY 和 OPENAI_MODEL。",
@@ -86,7 +87,8 @@ function requiredConfiguration() {
     );
   }
 
-  return { apiKey, model };
+  const runtimeEnv = process.env as RuntimeEnvironment;
+  return { apiKey: runtimeEnv.OPENAI_API_KEY!.trim(), model: runtimeEnv.OPENAI_MODEL!.trim() };
 }
 
 function numericToken(value: unknown): number {

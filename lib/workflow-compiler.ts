@@ -21,6 +21,7 @@ type DiagnoseInput = {
     description?: string;
     sourceUrl?: string;
     safetyLabel?: string;
+    blocked?: boolean;
     permissionLabels?: string[];
   };
 };
@@ -285,6 +286,9 @@ function selectedRegistrySkillPlan(input: DiagnoseInput): WorkflowPlan {
   const name = selected.name.trim();
   if (!/^[a-z0-9][a-z0-9-]{0,119}$/.test(slug) || !name) {
     throw new Error("已选择的 Skill 标识无效");
+  }
+  if (selected.blocked) {
+    throw new Error("该 Skill 已被上游安全层阻断，不能放入工作流");
   }
 
   const skillNode: WorkflowNodePlan = {

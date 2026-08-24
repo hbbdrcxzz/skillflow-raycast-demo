@@ -79,3 +79,6 @@
 - A workflow diagram is a projection of one plan, not a second source of truth. Route canvas, node audit, explanation and CTA now all read the same `workflowPlan`.
 - “Advanced” visual quality came from fewer decorative layers and clearer decision hierarchy, not more glow. Live checks show the redesign can preserve dense technical information while keeping all decision text readable.
 - Browser QA found a state-transition bug that static tests missed: switching from a deeply scrolled Registry detail to a workflow kept the old scroll offset. Stage changes now reset to the top; this is included in Gate A verification.
+- “中文字段存在”不等于中文化完成。真实样本证明分类级通用文案会把学术研究、近期研究、搜索基础设施、计划压力测试和舆情分析错误合并；Gate A 因此采用“上游中文 → 人工规则覆盖 → 结构化语义 → 确定性分类 → 明确缺失”的证据优先顺序，并用真实噪声快照锁定语义。
+- Canonical 与 presentation 的边界不仅适用于 description，也适用于 tags：上游 tags 必须全量保留，展示层再自行限制数量。任何源事实截断都不能被称为 canonical exact。
+- 响应式图不是把桌面流程图缩小。390 px 下横向节点虽没有造成 document-level overflow，仍会被容器裁切；移动端必须把 source、Skill、output 转为纵向信息流并保留完整可读文本。

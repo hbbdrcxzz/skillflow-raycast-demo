@@ -14,6 +14,7 @@ export async function POST(request: Request) {
         description?: string;
         sourceUrl?: string;
         safetyLabel?: string;
+        blocked?: boolean;
         permissionLabels?: string[];
       };
     };
@@ -30,6 +31,7 @@ export async function POST(request: Request) {
             description: body.selectedSkill.description,
             sourceUrl: body.selectedSkill.sourceUrl,
             safetyLabel: body.selectedSkill.safetyLabel,
+            blocked: body.selectedSkill.blocked,
             permissionLabels: body.selectedSkill.permissionLabels,
           }
         : undefined,

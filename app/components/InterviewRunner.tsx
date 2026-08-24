@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type Evidence = { evidence_id: string; quote: string; interpretation: string; category: string; confidence: number };
 type Theme = { theme_id: string; title: string; statement: string; supporting_evidence_ids: string[]; counter_evidence_ids: string[]; strength: string; product_implication: string; uncertainty: string };
@@ -33,7 +33,23 @@ export default function InterviewRunner({ onBack }: { onBack: () => void }) {
   const [prd, setPrd] = useState<PrdResult | null>(null);
   const [status, setStatus] = useState<"idle" | "analyzing" | "generating">("idle");
   const [error, setError] = useState<{ code?: string; message: string } | null>(null);
+  const [runtimeConfig, setRuntimeConfig] = useState<"probing" | "ready" | "unconfigured">("probing");
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // 前置探测运行层配置：用户投入材料前就知道真实运行是否可用。
+  useEffect(() => {
+    let active = true;
+    fetch("/api/runs/interview/config")
+      .then(async (response) => {
+        if (!active) return;
+        const payload = (await response.json()) as { configured?: boolean };
+        if (active) setRuntimeConfig(payload.configured ? "ready" : "unconfigured");
+      })
+      .catch(() => {
+        if (active) setRuntimeConfig("unconfigured");
+      });
+    return () => { active = false; };
+  }, []);
 
   const approvedThemes = useMemo(() => analysis?.analysis.themes.filter((theme) => approved.includes(theme.theme_id)).map((theme) => ({ ...theme, approved_title: theme.title, approved_statement: theme.statement, approval_note: null })) || [], [analysis, approved]);
 
@@ -113,7 +129,7 @@ export default function InterviewRunner({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="runner-shell stage-enter">
-      <div className="runner-top"><button onClick={onBack}>← 返回能力路径</button><div><span className="live-dot" /> 真实受控运行</div><small>不会执行任意第三方脚本</small></div>
+      <div className="runner-top"><button onClick={onBack}>← 返回能力路径</button><div><span className="live-dot" /> 真实受控运行{runtimeConfig === "unconfigured" && <em className="runtime-badge">需服务端凭据</em>}</div><small>不会执行任意第三方脚本</small></div>
       <div className="runner-head"><div><div className="micro-label">黄金工作流 01 · 互联网产品 · 7 个真实节点</div><h2>访谈原文进入，证据与 PRD 出来。</h2><p>模型负责证据提取、洞察聚类、逐节点 AI 适配判断和 PRD 初稿；材料标准化、人工主题批准与质量检查分别由确定性规则和人负责。</p></div><div className="runner-flow"><span>标准化</span><i>→</i><span>证据</span><i>→</i><span>洞察</span><i>→</i><span>AI 适配</span><i>→</i><b>人确认</b><i>→</i><span>PRD</span><i>→</i><span>质检</span></div></div>
 
       <div className="runner-grid">

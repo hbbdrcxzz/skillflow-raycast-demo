@@ -190,6 +190,57 @@ test("selected Registry workflow only returns safe external source links", async
   assert.equal(body.plan.candidateSkill.sourceUrl, undefined);
 });
 
+test("blocked Registry Skills cannot be placed into a workflow through the API", async () => {
+  const app = await worker();
+  const response = await app.fetch(
+    interviewRequest("/api/workflows/diagnose", {
+      goal: "把 Blocked Skill 放入工作流",
+      selectedSkill: {
+        slug: "blocked-skill",
+        name: "Blocked Skill",
+        blocked: true,
+      },
+    }),
+    env(),
+    ctx(),
+  );
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /已被上游安全层阻断/);
+});
+
+test("blocked Registry Skills never expose an install handoff", async () => {
+  const app = await worker();
+  const originalFetch = globalThis.fetch;
+  const upstreamRequests = [];
+  globalThis.fetch = async (url) => {
+    upstreamRequests.push(String(url));
+    if (String(url).includes("/api/registry/manifest/blocked-skill")) {
+      return Response.json({
+        slug: "blocked-skill",
+        name: "Blocked Skill",
+        description: "Unsafe upstream package.",
+        safety: { blocked: true },
+      });
+    }
+    throw new Error("blocked Skill must not reach the upstream install endpoint");
+  };
+
+  try {
+    const response = await app.fetch(
+      new Request("http://localhost/api/registry/skills/blocked-skill/install"),
+      env(),
+      ctx(),
+    );
+    assert.equal(response.status, 451);
+    const body = await response.json();
+    assert.equal(body.error.code, "SKILL_BLOCKED");
+    assert.equal(body.policy.executeOnServer, false);
+    assert.equal(upstreamRequests.length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("product source does not claim persistence, runs or versions that do not exist", async () => {
   const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   assert.doesNotMatch(
