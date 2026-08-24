@@ -102,3 +102,24 @@
 ### Awaiting
 - Red Team issued PASS after the final canonical-tags correction and kept PASS after the delta-only review of blocked-Skill hardening, runtime configuration honesty, command keyboard navigation and upstream raw-field minimization. No P0/P1 remains in Gate A.
 - Private Sites publication of the exact validated commit, followed by user approval before Gate B. Gate B has not started.
+
+## Session: 2026-08-25 — Gate B AI Work Discovery
+
+### Implemented
+- Replaced the fixed three-question wizard with a free-form multi-turn work interview. Direct-task entry pre-fills only the task the user explicitly typed, while discovery starts with an empty composer.
+- Added a structured fact memory separating user-confirmed, system-inferred, unknown and conflicted facts. Every fact preserves message/quote provenance; fabricated quotes and invalid model schemas are rejected server-side.
+- Added dependency-graph validation for inferred facts. A system inference can contribute to readiness only when its complete acyclic dependency closure ends in user-confirmed facts; unknown and conflicted facts cannot silently support confirmation.
+- Added editable fact operations with dependent-inference invalidation and atomic conflict resolution. The Task Contract is deterministically projected from the current fact set and never maintained as a second truth source.
+- Added server-side sufficiency and explicit-confirmation gates. Negative statements such as “我不确认” are rejected before positive-keyword matching; only a user-confirmed contract can generate abstract work nodes.
+- Kept Gate B inside its product boundary: abstract nodes expose evidence references, initial AI suitability, human/AI responsibilities and risk, but do not bind a SkillRelease, execute a task, claim persistence or invent a version.
+- Added pre-send disclosure for external-model and possible cross-border processing, sensitive-data warnings, truthful current-session clearing, request-size and sequence protection, retry/cancel behavior, IME-safe keyboard handling and accessible live/error states.
+
+### Verification
+- `git diff --check`, `npm run lint`, production build and the full test command passed serially; the combined suite is 39/39 PASS.
+- Gate B tests cover rich/ambiguous/unknown/corrected conversations, quote grounding, invalid dependency graphs, conflict replacement, negative and premature confirmation, stale sequence, missing model, malformed output, prompt injection, oversized requests, UI boundaries and decision-text sizing.
+- Real-browser checks passed at 390 and 1440 px with no horizontal overflow. The discovery entry starts blank, direct entry preserves the explicit task, the model-not-configured path retains the unsent text and offers retry without claiming AI analysis, and the fixed questionnaire is absent.
+- Final independent Red Team review passed B1–B8 with no P0/P1 blockers. Remaining P2 ideas are risk-tiered sufficiency for very small tasks, side-by-side conflict evidence, full modal focus trapping and clearer “initial AI judgment” wording.
+
+### Boundary Before Gate C
+- The implementation is ready for user acceptance, but a deployed environment must have server-side `OPENAI_API_KEY` and `OPENAI_MODEL` configured before live inference can run. Without them, the intended honest 503/retry state is shown.
+- Do not start concrete Skill recommendation, node binding, replacement, versioning or sandbox execution until the user approves Gate B and explicitly authorizes Gate C.

@@ -4,7 +4,7 @@
 Build a China-first, production-capable Skill marketplace and workbench for internet product and operations users. The acceptance bar is no longer a visual prototype: users must be able to discover real upstream Skills, inspect evidence and install handoffs, place Skills into a diagnosed workflow, run an allowlisted golden workflow against real user material, approve intermediate results, and download a real artifact.
 
 ## Current Phase
-Gate A — Honest Chinese Marketplace (user approval required before Gate B)
+Gate B — AI Work Discovery complete and independently accepted; awaiting user approval before Gate C
 
 ## Phases
 
@@ -41,8 +41,8 @@ Gate A — Honest Chinese Marketplace (user approval required before Gate B)
 ### Phase 4: Product Experience Integration
 - [ ] Convert the current prototype state into persisted production states
 - [ ] Add a cached Chinese presentation/search layer for imported Skills while preserving original names, authorship, repositories, licenses, and source-language fields
-- [ ] Build dual entry: single Skill and AI workflow diagnosis
-- [ ] Replace the fixed three-question wizard with free-form multi-turn diagnosis, adaptive clarification, editable Task Contract, explicit assumptions, and a workflow graph generated from the confirmed contract
+- [x] Build dual entry: single Skill and AI workflow diagnosis
+- [x] Replace the fixed three-question wizard with free-form multi-turn diagnosis, adaptive clarification, editable Task Contract, explicit assumptions, and a workflow graph generated from the confirmed contract
 - [ ] Build Workflow Lab, Node Inspector, Skill comparison, Outcome Lens, structured Diff, Command Home, and Artifact views
 - [ ] Make each node editable across two independent dimensions: human/AI execution mode and zero/one/multiple pinned SkillRelease implementations; connect node search, comparison, replacement, split/merge, ordering, and approval points to one WorkflowRevision
 - [ ] Cover empty, denied, expired, partial-success, outcome-unknown, outdated, and risk states
@@ -88,8 +88,19 @@ Gate A — Honest Chinese Marketplace (user approval required before Gate B)
 | One audit-note patch missed the exact markdown context | Re-read the local section and applied a narrower verified patch |
 
 ## Audit-Driven Delivery Gates (2026-08-22)
-1. **Gate A — honest Chinese marketplace (in progress):** fix the Registry-to-workflow misrouting, add Chinese briefs/search metadata, full Skill decision fields, and remove scripted save/success claims.
-2. **Gate B — AI work discovery:** free-form conversation, adaptive clarification, editable Task Contract, visible assumptions, and a graph generated from the confirmed contract.
+1. **Gate A — honest Chinese marketplace (complete, user approved):** Registry identity routing, canonical/Chinese presentation separation, truthful states, blocked-Skill enforcement, responsive typography and private Sites version 5 all passed Red Team review.
+2. **Gate B — AI work discovery (complete, awaiting user approval):** free-form conversation, adaptive clarification, editable and traceable Task Contract, explicit confirmation, and abstract work nodes generated only from the confirmed contract. Final independent Red Team review passed B1–B8 with no P0/P1 blockers; lint, production build, full 39/39 tests and 390/1440 real-browser checks passed.
 3. **Gate C — editable Skill composition:** node-level execution mode, real SkillRelease recommendations/replacement/combination, semantic Diff and immutable WorkflowRevision.
 4. **Gate D — one genuine sandbox loop:** preflight, allowlisted run, approval, partial-failure handling, real Artifact/receipt, persistence and reopen from Command Home.
 5. **Gate E — creator foundation:** submit/import/create draft, source/license/safety review, E1/E2 evaluation, immutable release and claim; analytics and one-time paid distribution remain post-traffic work.
+
+## Gate B Acceptance Contract (Red Team hard gates)
+
+1. Natural-language messages are the primary input. The next question is selected from the highest-value information gap, not a fixed index, option list or round count; a rich answer can fill multiple facts and “unknown” is valid.
+2. Every fact separates `user_confirmed`, `system_inferred`, `unknown` and `conflicted`, keeps message/quote provenance, and rejects any quote that is not a literal substring of the corresponding user message.
+3. The editable fact model covers the task goal, current steps, inputs/systems, output/audience, acceptance, frequency/volume/time, tools, human approval, exceptions and sensitive data as relevant. The Task Contract is a projection of these facts, never a second truth source.
+4. Readiness is computed server-side. No critical missing/conflict may remain, and the user must explicitly confirm the summary; a forced early draft stays `unconfirmed_draft` and cannot claim to be runnable.
+5. Gate B may output only abstract work nodes with fact references, AI suitability, human/AI responsibilities and risk. Specific SkillRelease binding, execution, persistence and versions belong to Gates C/D.
+6. Unconfigured model, timeout, malformed schema, fabricated quote, prompt injection and oversized input fail honestly. No deterministic questionnaire may impersonate AI. Raw user messages remain local session data and are rendered as text.
+7. Before the first send, the UI discloses external-model/cross-border processing, excludes files/connectors from diagnosis, warns against secrets/sensitive personal data, and offers a truthful current-session clear action. Keyboard, IME, aria-live and 390 px layouts are required.
+8. Acceptance requires golden conversations, failure/abuse tests, edit invalidation, confirmation eligibility, Gate C boundary assertions, real browser keyboard/mobile checks, lint/build/diff-check and a final independent Red Team PASS.

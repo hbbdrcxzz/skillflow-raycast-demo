@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { WorkflowPlan } from "@/lib/contracts";
 import RegistryBrowser from "@/app/components/RegistryBrowser";
 import InterviewRunner from "@/app/components/InterviewRunner";
+import WorkflowInterview from "@/app/components/WorkflowInterview";
 
 type Stage = "home" | "catalog" | "diagnose" | "routes" | "runner" | "lens" | "dashboard";
 
@@ -16,24 +17,6 @@ type SelectedRegistrySkill = {
   attribution?: { sourceUrl?: string };
 };
 
-const questions = [
-  {
-    eyebrow: "资料主要在哪里？",
-    help: "只选择真正会用到的来源，权限会按这里缩小。",
-    options: ["飞书文档", "Excel", "会议记录", "我稍后提供"],
-  },
-  {
-    eyebrow: "谁会阅读最终结果？",
-    help: "AI 会据此调整结构、语气和证据密度。",
-    options: ["管理层", "项目团队", "客户", "只给自己"],
-  },
-  {
-    eyebrow: "这项工作多久发生一次？",
-    help: "频率决定先推荐单个 Skill，还是沉淀完整工作流。",
-    options: ["每周", "每天", "每月", "只做一次"],
-  },
-];
-
 const skillShelf = [
   { code: "WR", name: "管理层周报", meta: "官方预制样例 · 非真实运行", color: "mint", goal: "整理本周项目进展，生成管理层周报" },
   { code: "IN", name: "访谈到 PRD", meta: "真实模型链 · 运行需要服务端配置", color: "violet", goal: "把用户访谈拆成证据和洞察，最终生成可评审 PRD" },
@@ -43,10 +26,8 @@ const skillShelf = [
 export default function Home() {
   const [stage, setStage] = useState<Stage>("home");
   const [task, setTask] = useState("整理本周项目进度，生成管理层周报");
+  const [interviewSeed, setInterviewSeed] = useState("");
   const [commandOpen, setCommandOpen] = useState(false);
-  const [questionIndex, setQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState<string[]>([]);
-  const [selectedOption, setSelectedOption] = useState("");
   const [lens, setLens] = useState(42);
   const [adjustment, setAdjustment] = useState("只保留三个关键数字，结论改成管理层语言");
   const [toast, setToast] = useState("");
@@ -60,7 +41,7 @@ export default function Home() {
     () => [
       { icon: "↗", title: "直接开始这项任务", note: task || "描述一项工作", action: "diagnose" as const },
       { icon: "⌕", title: "匹配一个 Skill", note: "进入真实目录，按任务搜索与比较", action: "catalog" as const },
-      { icon: "✦", title: "帮我发现可交给 AI 的工作", note: "用 3 个问题分析你的重复工作", action: "diagnose" as const },
+      { icon: "✦", title: "帮我发现可交给 AI 的工作", note: "用自然语言梳理工作，AI 只追问关键缺口", action: "discover" as const },
     ],
     [task],
   );
@@ -75,6 +56,7 @@ export default function Home() {
         window.setTimeout(() => inputRef.current?.focus(), 40);
       }
       if (event.key === "Escape") {
+        if (stage === "diagnose") return;
         if (stage !== "home") setStage("home");
         else setCommandOpen(false);
       }
@@ -92,16 +74,19 @@ export default function Home() {
           event.preventDefault();
           const target = commandGroups[commandIndex].action;
           setCommandOpen(false);
-          setQuestionIndex(0);
-          setAnswers([]);
-          setSelectedOption("");
-          setStage(target);
+          if (target === "discover") {
+            setInterviewSeed("");
+            setStage("diagnose");
+          } else {
+            if (target === "diagnose") setInterviewSeed(task);
+            setStage(target);
+          }
         }
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [stage, commandOpen, commandIndex, commandGroups]);
+  }, [stage, commandOpen, commandIndex, commandGroups, task]);
 
   useEffect(() => {
     if (!toast) return;
@@ -113,30 +98,16 @@ export default function Home() {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [stage]);
 
-  const activeQuestion = questions[questionIndex];
-
-  function startFlow(target: "diagnose" | "routes" | "catalog" = "diagnose") {
+  function startFlow(target: "diagnose" | "discover" | "routes" | "catalog" = "diagnose") {
     setCommandOpen(false);
-    setQuestionIndex(0);
-    setAnswers([]);
-    setSelectedOption("");
+    if (target === "discover") {
+      setInterviewSeed("");
+      setStage("diagnose");
+      return;
+    }
+    if (target === "diagnose") setInterviewSeed(task);
     setStage(target);
     if (target === "routes") void compileCurrentPlan([]);
-  }
-
-  function confirmAnswer() {
-    if (!selectedOption) return;
-    const nextAnswers = [...answers, selectedOption];
-    setAnswers(nextAnswers);
-    setSelectedOption("");
-    if (questionIndex === questions.length - 1) {
-      window.setTimeout(() => {
-        setStage("routes");
-        void compileCurrentPlan(nextAnswers);
-      }, 180);
-    } else {
-      setQuestionIndex((value) => value + 1);
-    }
   }
 
   async function compileCurrentPlan(answerSet: string[], goalOverride?: string, selectedSkill?: SelectedRegistrySkill) {
@@ -191,7 +162,7 @@ export default function Home() {
         <nav className="nav-links" aria-label="主导航">
           <button className={stage === "home" ? "active" : ""} onClick={() => setStage("home")}>发现</button>
           <button className={stage === "catalog" ? "active" : ""} onClick={() => setStage("catalog")}>Skill 商店</button>
-          <button onClick={() => { setStage("routes"); void compileCurrentPlan([], task); }}>工作流</button>
+          <button className={stage === "diagnose" ? "active" : ""} onClick={() => { setInterviewSeed(task); setStage("diagnose"); }}>工作流</button>
           <button onClick={() => setStage("dashboard")}>我的空间</button>
           <button onClick={() => setToast("创作者中心将在 Gate E 接入；当前没有伪造发布或收益状态")}>创作者中心</button>
         </nav>
@@ -275,7 +246,7 @@ export default function Home() {
         <section className="experience-wrap stage-enter">
           <div className="context-line">
             <button onClick={() => setStage("home")}>← 返回发现</button>
-            <div className="task-context"><span>当前任务</span><strong>{task}</strong></div>
+            <div className="task-context"><span>当前任务</span><strong>{stage === "diagnose" && !interviewSeed ? "发现最值得先交给 AI 的工作" : task}</strong></div>
             <span className="save-state"><i /> 当前仅预览，尚未保存</span>
           </div>
 
@@ -293,45 +264,11 @@ export default function Home() {
             {stage === "runner" && <InterviewRunner onBack={() => setStage("routes")} />}
 
             {stage === "diagnose" && (
-              <div className="diagnose-layout stage-enter">
-                <div className="diagnose-main">
-                  <div className="progress-mini"><span style={{ width: `${((questionIndex + 1) / questions.length) * 100}%` }} /></div>
-                  <div className="micro-label">工作诊断 · {questionIndex + 1} / {questions.length}</div>
-                  <h2>{activeQuestion.eyebrow}</h2>
-                  <p>{activeQuestion.help}</p>
-
-                  <div className="option-list" role="listbox" aria-label={activeQuestion.eyebrow}>
-                    {activeQuestion.options.map((option, index) => (
-                      <button
-                        key={option}
-                        className={selectedOption === option ? "selected" : ""}
-                        onClick={() => setSelectedOption(option)}
-                        role="option"
-                        aria-selected={selectedOption === option}
-                      >
-                        <kbd>{index + 1}</kbd><span>{option}</span><i>{selectedOption === option ? "✓" : ""}</i>
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="diagnose-actions">
-                    <button className="ghost" onClick={() => setStage("home")}>取消</button>
-                    <button className="primary" disabled={!selectedOption} onClick={confirmAnswer}>
-                      {questionIndex === questions.length - 1 ? "生成能力路径" : "继续"} <span>↗</span>
-                    </button>
-                  </div>
-                </div>
-
-                <aside className="diagnose-aside">
-                  <div className="aside-header"><span className="pulse-orb">✦</span><div><strong>AI 正在建立任务上下文</strong><small>只保留影响匹配的关键信息</small></div></div>
-                  <div className="confirmed-list">
-                    <div className={answers[0] ? "done" : "active"}><span>01</span><p>资料来源<small>{answers[0] || "等待确认"}</small></p></div>
-                    <div className={answers[1] ? "done" : questionIndex === 1 ? "active" : ""}><span>02</span><p>结果受众<small>{answers[1] || "等待确认"}</small></p></div>
-                    <div className={answers[2] ? "done" : questionIndex === 2 ? "active" : ""}><span>03</span><p>发生频率<small>{answers[2] || "等待确认"}</small></p></div>
-                  </div>
-                  <div className="privacy-note"><span>⌁</span> 你的连接和文件不会在诊断阶段被读取。</div>
-                </aside>
-              </div>
+              <WorkflowInterview
+                initialGoal={interviewSeed}
+                onBack={() => setStage("home")}
+                onConfirmed={() => setToast("任务合同已由你确认；抽象节点仍未绑定 Skill，也没有运行或保存")}
+              />
             )}
 
             {stage === "routes" && (
@@ -342,7 +279,7 @@ export default function Home() {
                     <span className={`compile-state ${compileState}`}><i />{compileState === "compiling" ? "正在编译任务" : compileState === "ready" ? "计划合同校验通过" : compileState === "error" ? "需要重试" : "等待任务"}</span>
                     <button className="ghost" onClick={() => {
                       if (workflowPlan?.state === "needs_configuration") setStage("catalog");
-                      else { setStage("diagnose"); setQuestionIndex(0); setAnswers([]); }
+                      else { setInterviewSeed(task); setStage("diagnose"); }
                     }}>{workflowPlan?.state === "needs_configuration" ? "返回目录核验" : "调整上下文"}</button>
                   </div>
                 </div>
