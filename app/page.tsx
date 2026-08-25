@@ -5,8 +5,9 @@ import type { WorkflowPlan } from "@/lib/contracts";
 import RegistryBrowser from "@/app/components/RegistryBrowser";
 import InterviewRunner from "@/app/components/InterviewRunner";
 import WorkflowInterview from "@/app/components/WorkflowInterview";
+import CompositionStudio, { type CompositionStudioBootstrap } from "@/app/components/CompositionStudio";
 
-type Stage = "home" | "catalog" | "diagnose" | "routes" | "runner" | "lens" | "dashboard";
+type Stage = "home" | "catalog" | "diagnose" | "compose" | "routes" | "runner" | "lens" | "dashboard";
 
 type SelectedRegistrySkill = {
   slug: string;
@@ -27,6 +28,7 @@ export default function Home() {
   const [stage, setStage] = useState<Stage>("home");
   const [task, setTask] = useState("整理本周项目进度，生成管理层周报");
   const [interviewSeed, setInterviewSeed] = useState("");
+  const [compositionBootstrap, setCompositionBootstrap] = useState<CompositionStudioBootstrap | null>(null);
   const [commandOpen, setCommandOpen] = useState(false);
   const [lens, setLens] = useState(42);
   const [adjustment, setAdjustment] = useState("只保留三个关键数字，结论改成管理层语言");
@@ -56,7 +58,7 @@ export default function Home() {
         window.setTimeout(() => inputRef.current?.focus(), 40);
       }
       if (event.key === "Escape") {
-        if (stage === "diagnose") return;
+        if (stage === "diagnose" || stage === "compose") return;
         if (stage !== "home") setStage("home");
         else setCommandOpen(false);
       }
@@ -75,10 +77,14 @@ export default function Home() {
           const target = commandGroups[commandIndex].action;
           setCommandOpen(false);
           if (target === "discover") {
+            setCompositionBootstrap(null);
             setInterviewSeed("");
             setStage("diagnose");
           } else {
-            if (target === "diagnose") setInterviewSeed(task);
+            if (target === "diagnose") {
+              setCompositionBootstrap(null);
+              setInterviewSeed(task);
+            }
             setStage(target);
           }
         }
@@ -101,11 +107,15 @@ export default function Home() {
   function startFlow(target: "diagnose" | "discover" | "routes" | "catalog" = "diagnose") {
     setCommandOpen(false);
     if (target === "discover") {
+      setCompositionBootstrap(null);
       setInterviewSeed("");
       setStage("diagnose");
       return;
     }
-    if (target === "diagnose") setInterviewSeed(task);
+    if (target === "diagnose") {
+      setCompositionBootstrap(null);
+      setInterviewSeed(task);
+    }
     setStage(target);
     if (target === "routes") void compileCurrentPlan([]);
   }
@@ -162,7 +172,10 @@ export default function Home() {
         <nav className="nav-links" aria-label="主导航">
           <button className={stage === "home" ? "active" : ""} onClick={() => setStage("home")}>发现</button>
           <button className={stage === "catalog" ? "active" : ""} onClick={() => setStage("catalog")}>Skill 商店</button>
-          <button className={stage === "diagnose" ? "active" : ""} onClick={() => { setInterviewSeed(task); setStage("diagnose"); }}>工作流</button>
+          <button className={stage === "diagnose" || stage === "compose" ? "active" : ""} onClick={() => {
+            if (compositionBootstrap) setStage("compose");
+            else { setInterviewSeed(task); setStage("diagnose"); }
+          }}>工作流</button>
           <button onClick={() => setStage("dashboard")}>我的空间</button>
           <button onClick={() => setToast("创作者中心将在 Gate E 接入；当前没有伪造发布或收益状态")}>创作者中心</button>
         </nav>
@@ -231,8 +244,9 @@ export default function Home() {
                     return;
                   }
                   setTask(skill.goal);
-                  setStage("routes");
-                  void compileCurrentPlan([], skill.goal);
+                  setCompositionBootstrap(null);
+                  setInterviewSeed(skill.goal);
+                  setStage("diagnose");
                 }}>
                   <span className={`skill-glyph ${skill.color}`}>{skill.code}</span>
                   <span><strong>{skill.name}</strong><small>{skill.meta}</small></span>
@@ -246,18 +260,16 @@ export default function Home() {
         <section className="experience-wrap stage-enter">
           <div className="context-line">
             <button onClick={() => setStage("home")}>← 返回发现</button>
-            <div className="task-context"><span>当前任务</span><strong>{stage === "diagnose" && !interviewSeed ? "发现最值得先交给 AI 的工作" : task}</strong></div>
+            <div className="task-context"><span>当前任务</span><strong>{stage === "compose" ? "逐节点选择最适配的 Skill 或组合" : stage === "diagnose" && !interviewSeed ? "发现最值得先交给 AI 的工作" : task}</strong></div>
             <span className="save-state"><i /> 当前仅预览，尚未保存</span>
           </div>
 
           <section className={`product-machine machine-${stage}`}>
             {stage === "catalog" && (
               <RegistryBrowser onUseInWorkflow={(skill) => {
-                const nextTask = `把 ${skill.name} 适配到我的工作流`;
-                setTask(nextTask);
-                setToast(`已选择 ${skill.name}，下一步确认它在工作流中的职责`);
-                setStage("routes");
-                void compileCurrentPlan([], nextTask, skill);
+                setCompositionBootstrap({ kind: "registry_single", slug: skill.slug });
+                setToast(`正在从服务端重新核验 ${skill.name} 的真实来源和清单摘要`);
+                setStage("compose");
               }} />
             )}
 
@@ -267,7 +279,18 @@ export default function Home() {
               <WorkflowInterview
                 initialGoal={interviewSeed}
                 onBack={() => setStage("home")}
-                onConfirmed={() => setToast("任务合同已由你确认；抽象节点仍未绑定 Skill，也没有运行或保存")}
+                onConfirmed={(snapshot, workflow) => {
+                  setCompositionBootstrap({ kind: "gate_b_diagnosis", snapshot, workflow });
+                  setToast("任务合同已确认，正在建立逐节点 Skill 编排草案");
+                  setStage("compose");
+                }}
+              />
+            )}
+
+            {stage === "compose" && compositionBootstrap && (
+              <CompositionStudio
+                bootstrap={compositionBootstrap}
+                onBack={() => setStage(compositionBootstrap.kind === "registry_single" ? "catalog" : "home")}
               />
             )}
 
@@ -360,7 +383,7 @@ export default function Home() {
                     ) : workflowPlan?.state === "needs_configuration" ? (
                       <button className="primary" onClick={() => setStage("catalog")}>返回目录核验详情 <span>↗</span></button>
                     ) : (
-                      <button className="primary" onClick={() => { setStage("diagnose"); setQuestionIndex(0); setAnswers([]); }}>继续补充上下文 <span>↗</span></button>
+                      <button className="primary" onClick={() => { setInterviewSeed(task); setStage("diagnose"); }}>继续补充上下文 <span>↗</span></button>
                     )}
                   </div>
                 </div>

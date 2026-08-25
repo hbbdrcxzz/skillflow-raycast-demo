@@ -4,7 +4,7 @@
 Build a China-first, production-capable Skill marketplace and workbench for internet product and operations users. The acceptance bar is no longer a visual prototype: users must be able to discover real upstream Skills, inspect evidence and install handoffs, place Skills into a diagnosed workflow, run an allowlisted golden workflow against real user material, approve intermediate results, and download a real artifact.
 
 ## Current Phase
-Gate B — AI Work Discovery complete and independently accepted; awaiting user approval before Gate C
+Gate C — Editable Skill Composition complete; independent Red Team PASS, awaiting user approval before private deployment or Gate D
 
 ## Phases
 
@@ -89,8 +89,8 @@ Gate B — AI Work Discovery complete and independently accepted; awaiting user 
 
 ## Audit-Driven Delivery Gates (2026-08-22)
 1. **Gate A — honest Chinese marketplace (complete, user approved):** Registry identity routing, canonical/Chinese presentation separation, truthful states, blocked-Skill enforcement, responsive typography and private Sites version 5 all passed Red Team review.
-2. **Gate B — AI work discovery (complete, awaiting user approval):** free-form conversation, adaptive clarification, editable and traceable Task Contract, explicit confirmation, and abstract work nodes generated only from the confirmed contract. Final independent Red Team review passed B1–B8 with no P0/P1 blockers; lint, production build, full 39/39 tests and 390/1440 real-browser checks passed.
-3. **Gate C — editable Skill composition:** node-level execution mode, real SkillRelease recommendations/replacement/combination, semantic Diff and immutable WorkflowRevision.
+2. **Gate B — AI work discovery (complete, user approved, privately deployed as Sites version 6):** free-form conversation, adaptive clarification, editable and traceable Task Contract, explicit confirmation, and abstract work nodes generated only from the confirmed contract. Final independent Red Team review passed B1–B8 with no P0/P1 blockers; lint, production build, full 39/39 tests and 390/1440 real-browser checks passed.
+3. **Gate C — editable Skill composition (complete, awaiting user approval):** confirmed Gate B handoff or Registry single-Skill entry, node-level execution mode, authoritative Release pins, task-fit recommendations, zero/one/ordered-multiple Skill composition, permission review, semantic Diff and immutable session-only WorkflowRevision. Final independent Red Team review passed C1–C8 with no P0/P1 blockers; production build, full 60/60 tests, lint/diff-check and 390/720/1024/1440 real-browser checks passed.
 4. **Gate D — one genuine sandbox loop:** preflight, allowlisted run, approval, partial-failure handling, real Artifact/receipt, persistence and reopen from Command Home.
 5. **Gate E — creator foundation:** submit/import/create draft, source/license/safety review, E1/E2 evaluation, immutable release and claim; analytics and one-time paid distribution remain post-traffic work.
 
@@ -104,3 +104,19 @@ Gate B — AI Work Discovery complete and independently accepted; awaiting user 
 6. Unconfigured model, timeout, malformed schema, fabricated quote, prompt injection and oversized input fail honestly. No deterministic questionnaire may impersonate AI. Raw user messages remain local session data and are rendered as text.
 7. Before the first send, the UI discloses external-model/cross-border processing, excludes files/connectors from diagnosis, warns against secrets/sensitive personal data, and offers a truthful current-session clear action. Keyboard, IME, aria-live and 390 px layouts are required.
 8. Acceptance requires golden conversations, failure/abuse tests, edit invalidation, confirmation eligibility, Gate C boundary assertions, real browser keyboard/mobile checks, lint/build/diff-check and a final independent Red Team PASS.
+
+## Gate C Acceptance Contract (Red Team hard gates)
+
+1. Diagnosed composition must bootstrap only from a confirmed Gate B snapshot, confirmed Task Contract and matching AbstractWorkflow. The first revision preserves the contract/fact digests, source node IDs, source fact IDs and boundaries; it never rebuilds the task from a goal keyword.
+2. Execution mode and Skill implementation are independent decisions. Human-only and deterministic nodes may use zero Skills; AI modes without an eligible binding remain unconfigured; high-risk approval or external-action nodes cannot become unattended automation.
+3. Every binding is resolved authoritatively on the server. A Release Pin preserves provider, canonical identity, author/source/license, permission and compatibility facts plus an immutable runtime/source release or a normalized Manifest snapshot digest. Snapshot-only pins never pretend to be author versions or hosted runtime releases; blocked Skills cannot be candidates or bindings.
+4. Node recommendations separate current-task fit from Registry quality/trust/safety signals. Deterministic hard constraints filter first; evidence-backed assessment then explains fit, non-fit, unknowns and why a primary candidate ranks above at most two alternatives. Model ranking may only reference a server candidate allowlist.
+5. Zero, one and multiple Skills are all valid outcomes. Multi-Skill MVP is a strict in-node sequence with explicit roles and continuous order; adjacent input/output compatibility, duplicate responsibility, permission union, side effects and fallback must be validated. Unknown compatibility is unresolved, not compatible.
+6. Direct controls may create a revision immediately; natural-language correction creates a structured proposal and preview Diff before application. Personalization modifies node constraints/configuration, never upstream authorship, license or source implementation. Requests for core implementation or permission expansion become an unresolved variant requirement.
+7. Every mutation produces an immutable session-only WorkflowRevision with parent, contract digest, graph/content digest, semantic Diff and validation. Old revisions never change; undo creates a new inverse revision; stale parents and client-forged Diffs are rejected. UI must say “current-session revision · not saved”.
+8. Gate C never installs, executes, authorizes connectors, creates Artifacts, claims results, or persists a workspace version. Registry/model/network/release failures preserve the current revision and offer retry/manual/human paths. Acceptance requires responsive 390/720/1024/1440 behavior, keyboard/IME/focus checks, failure/abuse tests, full lint/build/diff-check and final independent Red Team PASS with no P0/P1.
+
+### Gate C Frozen Boundaries
+- OpenAgentSkill entries without a trustworthy author version/commit may be bound only as `manifest_snapshot` pins. Their digest proves the observed metadata snapshot, not source code immutability or hosted executability.
+- Gate C revisions are immutable but session-only. D1 persistence, reopen across refresh/devices and conversion to `workflow_versions` belong to Gate D.
+- Multiple Skills are limited to a linear ordered sequence inside one business node. Branches, parallelism, loops and arbitrary graph authoring are outside this Gate.

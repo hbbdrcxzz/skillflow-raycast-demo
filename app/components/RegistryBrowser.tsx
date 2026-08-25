@@ -302,7 +302,7 @@ export default function RegistryBrowser({ onUseInWorkflow }: { onUseInWorkflow: 
                   </>
                 )}
               </section>
-              <div className="detail-actions"><button type="button" disabled={!selected.install.command || selected.safety.blocked} onClick={() => void copyCommand(selected)}>{copied === selected.slug ? "已复制" : "复制安装命令"}</button><button type="button" className="primary" disabled={selected.safety.blocked} onClick={() => onUseInWorkflow(selected)}>{selected.safety.blocked ? "已阻断 · 不可放入工作流" : "放入我的工作流 ↗"}</button></div>
+              <div className="detail-actions"><button type="button" disabled={!selected.install.command || selected.safety.blocked} onClick={() => void copyCommand(selected)}>{copied === selected.slug ? "已复制" : "复制安装命令"}</button><button type="button" className="primary" disabled={selected.safety.blocked} onClick={() => onUseInWorkflow(selected)}>{selected.safety.blocked ? "已阻断 · 不可适配" : "适配到我的工作 ↗"}</button></div>
               <div className="source-note">
                 <p>{selected.attribution.publicNote || "公开来源已保留原作者、仓库与许可证归属；进入索引不代表已获托管执行授权。"}</p>
                 <p>许可证：{selectedLicenseUrl ? <a href={selectedLicenseUrl} target="_blank" rel="noreferrer">{selected.license?.id || selected.license?.name || "查看许可证说明"}</a> : <span>{selected.license?.id || selected.license?.name ? `${selected.license?.id || selected.license?.name} · 许可证链接待核验` : "上游未提供许可证链接，待核验"}</span>}</p>
