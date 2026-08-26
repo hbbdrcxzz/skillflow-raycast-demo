@@ -568,7 +568,7 @@ export async function bootstrapComposition(value: unknown): Promise<CompositionR
   throw new CompositionContractError("INVALID_INPUT", "不支持的 composition source", 400);
 }
 
-async function validateRevisionEnvelope(revision: CompositionRevision): Promise<CompositionRevision> {
+async function validateRevisionEnvelope(revision: CompositionRevision, requireSession = true): Promise<CompositionRevision> {
   if (!revision || revision.schemaVersion !== GATE_C_SCHEMA_VERSION || revision.saved !== false || revision.runnable !== false || revision.persistence !== "session_only") {
     throw new CompositionContractError("REVISION_INVALID", "Gate C revision 边界或版本无效", 422);
   }
@@ -603,10 +603,12 @@ async function validateRevisionEnvelope(revision: CompositionRevision): Promise<
   if (expectedContentDigest !== revision.contentDigest || revision.revisionId !== `session_revision_${expectedContentDigest.slice(7, 23)}`) {
     throw new CompositionContractError("REVISION_INVALID", "Revision content digest 不一致", 422);
   }
-  const session = sessionOrThrow(revision.session.sessionId);
-  const stored = session?.revisions.get(revision.revisionId);
-  if (!stored || canonicalJson(stored) !== canonicalJson(revision)) {
-    throw new CompositionContractError("REVISION_INVALID", "Revision 不属于当前有效会话，或内容已被修改", 422);
+  if (requireSession) {
+    const session = sessionOrThrow(revision.session.sessionId);
+    const stored = session?.revisions.get(revision.revisionId);
+    if (!stored || canonicalJson(stored) !== canonicalJson(revision)) {
+      throw new CompositionContractError("REVISION_INVALID", "Revision 不属于当前有效会话，或内容已被修改", 422);
+    }
   }
   return revision;
 }
@@ -849,9 +851,7 @@ export async function reviseComposition(value: unknown): Promise<{ revision: Com
   });
 }
 
-export async function validateCompositionRevision(value: unknown): Promise<{ revision: CompositionRevision; validation: CompositionValidation }> {
-  const candidate = isRecord(value) && isRecord(value.revision) ? value.revision as CompositionRevision : value as CompositionRevision;
-  const revision = await validateRevisionEnvelope(candidate);
+async function validateResolvedRevision(revision: CompositionRevision): Promise<{ revision: CompositionRevision; validation: CompositionValidation }> {
   const nodes = await Promise.all(revision.nodes.map(deriveNode));
   const validation = validateCompositionNodes(nodes);
   for (const binding of revision.nodes.flatMap((node) => node.skillBindings.map((item) => ({ node, binding: item })))) {
@@ -871,6 +871,20 @@ export async function validateCompositionRevision(value: unknown): Promise<{ rev
   }
   validation.valid = validation.errors.length === 0;
   return { revision, validation };
+}
+
+export async function validateCompositionRevision(value: unknown): Promise<{ revision: CompositionRevision; validation: CompositionValidation }> {
+  const candidate = isRecord(value) && isRecord(value.revision) ? value.revision as CompositionRevision : value as CompositionRevision;
+  return validateResolvedRevision(await validateRevisionEnvelope(candidate));
+}
+
+// Gate C mutations remain bound to their short-lived in-memory session. Gate D
+// persistence must survive Worker isolate changes, so it revalidates the complete
+// self-contained envelope, every derived node and every authoritative Release,
+// then applies its much narrower fixed-Pack execution compiler.
+export async function validatePortableCompositionRevision(value: unknown): Promise<{ revision: CompositionRevision; validation: CompositionValidation }> {
+  const candidate = isRecord(value) && isRecord(value.revision) ? value.revision as CompositionRevision : value as CompositionRevision;
+  return validateResolvedRevision(await validateRevisionEnvelope(candidate, false));
 }
 
 export async function revisionForRecommendation(value: unknown): Promise<{ revision: CompositionRevision; nodeId: string; limit: number }> {

@@ -4,7 +4,7 @@
 Build a China-first, production-capable Skill marketplace and workbench for internet product and operations users. The acceptance bar is no longer a visual prototype: users must be able to discover real upstream Skills, inspect evidence and install handoffs, place Skills into a diagnosed workflow, run an allowlisted golden workflow against real user material, approve intermediate results, and download a real artifact.
 
 ## Current Phase
-Gate C — Editable Skill Composition complete; independent Red Team PASS, awaiting user approval before private deployment or Gate D
+Gate D — one genuine sandbox loop; user approved implementation on 2026-08-25 after Gate C was privately deployed as Sites version 7
 
 ## Phases
 
@@ -86,12 +86,15 @@ Gate C — Editable Skill Composition complete; independent Red Team PASS, await
 | Lint rejected a test variable named `module` | Renamed it to `workerBundle`; lint and all tests then passed |
 | Product/visual audit could not inspect the stopped localhost preview and the private URL timed out | Used the user-supplied full-resolution screenshot, current source, tests, deployment records and official product references; did not claim a fresh live walkthrough |
 | One audit-note patch missed the exact markdown context | Re-read the local section and applied a narrower verified patch |
+| Sites capability references were first resolved from the plugin `skills/references` directory | Used the filesystem-discovered `skills/sites-building/references` paths and continued; no product files were affected |
+| First Gate D lint pass found six unused/effect-state errors | Removed unused imports and eliminated synchronous effect state writes; rerun required |
+| A combined delete-and-add patch for `InterviewRunner.tsx` was rejected by `apply_patch` | Deleted and re-added the file in two safe patch operations |
 
 ## Audit-Driven Delivery Gates (2026-08-22)
 1. **Gate A — honest Chinese marketplace (complete, user approved):** Registry identity routing, canonical/Chinese presentation separation, truthful states, blocked-Skill enforcement, responsive typography and private Sites version 5 all passed Red Team review.
 2. **Gate B — AI work discovery (complete, user approved, privately deployed as Sites version 6):** free-form conversation, adaptive clarification, editable and traceable Task Contract, explicit confirmation, and abstract work nodes generated only from the confirmed contract. Final independent Red Team review passed B1–B8 with no P0/P1 blockers; lint, production build, full 39/39 tests and 390/1440 real-browser checks passed.
-3. **Gate C — editable Skill composition (complete, awaiting user approval):** confirmed Gate B handoff or Registry single-Skill entry, node-level execution mode, authoritative Release pins, task-fit recommendations, zero/one/ordered-multiple Skill composition, permission review, semantic Diff and immutable session-only WorkflowRevision. Final independent Red Team review passed C1–C8 with no P0/P1 blockers; production build, full 60/60 tests, lint/diff-check and 390/720/1024/1440 real-browser checks passed.
-4. **Gate D — one genuine sandbox loop:** preflight, allowlisted run, approval, partial-failure handling, real Artifact/receipt, persistence and reopen from Command Home.
+3. **Gate C — editable Skill composition (complete, user approved, privately deployed as Sites version 7):** confirmed Gate B handoff or Registry single-Skill entry, node-level execution mode, authoritative Release pins, task-fit recommendations, zero/one/ordered-multiple Skill composition, permission review, semantic Diff and immutable session-only WorkflowRevision. Final independent Red Team review passed C1–C8 with no P0/P1 blockers; production build, full 60/60 tests, lint/diff-check and 390/720/1024/1440 real-browser checks passed.
+4. **Gate D — one genuine sandbox loop (code/local contract complete; independent PASS; user checkpoint pending):** preflight, allowlisted seven-stage run, editable/versioned approval, partial-failure handling, real Artifact/quality receipt, persistence, retry/cancel and reopen from Command Home. Local contract-model verification passes; hosted real-model acceptance remains a deployment dependency.
 5. **Gate E — creator foundation:** submit/import/create draft, source/license/safety review, E1/E2 evaluation, immutable release and claim; analytics and one-time paid distribution remain post-traffic work.
 
 ## Gate B Acceptance Contract (Red Team hard gates)
@@ -120,3 +123,29 @@ Gate C — Editable Skill Composition complete; independent Red Team PASS, await
 - OpenAgentSkill entries without a trustworthy author version/commit may be bound only as `manifest_snapshot` pins. Their digest proves the observed metadata snapshot, not source code immutability or hosted executability.
 - Gate C revisions are immutable but session-only. D1 persistence, reopen across refresh/devices and conversion to `workflow_versions` belong to Gate D.
 - Multiple Skills are limited to a linear ordered sequence inside one business node. Branches, parallelism, loops and arbitrary graph authoring are outside this Gate.
+
+## Gate D Acceptance Contract (frozen implementation target)
+
+1. The only private-data golden path in this Gate is product/operations interview material to reviewable PRD. It accepts pasted text and bounded `.txt`/`.md` copies, uses the allowlisted built-in runtime, and never executes arbitrary upstream or user-supplied code.
+2. A run starts only from a persisted, validated WorkflowVersion derived from a Gate C revision. Preflight freezes exact node configuration and SkillRelease/manifest snapshot pins, validates input, permissions, model availability and run limits, and discloses external-model processing before dispatch.
+3. Runs and steps use backend-owned states: `queued`, `running`, `awaiting_approval`, `succeeded`, `partial_failed`, `failed`, and `cancelled`. UI progress must be derived from persisted state/receipts; timers or canned output cannot impersonate execution.
+4. Evidence extraction must preserve literal source traceability. Users can edit, reject or add evidence/themes at the approval gate; approval is explicit, immutable and tied to the exact run payload. Editing approved upstream material creates a new approval/revision and invalidates downstream output.
+5. The final Artifact is a real Markdown PRD plus deterministic quality report and node-level receipt. A completed claim requires persisted artifact metadata, model/provider/token/timing facts when available, warnings and exact run/workflow/release provenance.
+6. Refresh/reopen must restore the persisted workflow, run, current approval state, completed steps, artifacts and failures through Command Home. Retry creates an auditable new attempt and cannot silently overwrite a previous receipt.
+7. Missing model configuration, timeout, malformed model output, unsupported/oversized input, stale approval, persistence failure, cancellation and partial failure must fail honestly while preserving already committed data and offering a bounded retry/resume path.
+8. Gate D acceptance requires D1 migration review, API/auth/access-control tests, runtime and idempotency tests, responsive/keyboard/IME browser checks, lint/build/diff-check, a true end-to-end run with server-side model configuration, and independent Red Team PASS with no P0/P1 blockers. Without hosted model credentials, implementation may be code-complete but Gate D cannot be reported as production-run complete.
+
+### Gate D Frozen Boundaries
+- No arbitrary third-party scripts, connector writes, scheduled runs, payments, creator publishing, branches/loops or general-purpose graph execution.
+- The built-in interview-to-PRD runtime is the first execution adapter; the architecture must permit later allowlisted adapters without claiming they are already executable.
+- Anonymous/sample exploration may remain session-only, but private material, saving and real runs require authenticated Personal Workspace identity.
+- D1 is authoritative for workflow/run/approval/receipt metadata; R2 stores uploaded copies and Artifact bodies where appropriate. Browser storage is not evidence of persistence.
+
+### Gate D Schema and API Plan (frozen before code changes)
+- `workflow_versions` stores separate immutable Gate C composition and compiled runtime-plan snapshots plus adapter ID/version/digest; node Skill order and full Release Pins remain inside the validated snapshot for this Gate.
+- `runs` is the single aggregate root and gains request/preflight digests, state version, lease, cancellation, adapter provenance and updated time. The only terminal success is backed by a committed Artifact; quality-blocked output is `partial_failed`.
+- `run_steps` stores stable step key, attempt, exact Skill pin/digests, per-step input/output digests, model receipt, lease and update time. Attempts append; old receipts are never overwritten.
+- `approvals` stores immutable upstream/payload digests, revision and optional supersession. It is decided by the server-derived account and consumed only by the same workspace-scoped Run.
+- `artifacts` adds a pending/ready/failed/deleted commit state. Bytes are written to an opaque server-generated R2 key and verified before D1 exposes `ready` metadata.
+- API sequence: authenticated composition save → authenticated preflight/create queued Run → one-step CAS `advance` calls → immutable approval → further `advance` calls → workspace-scoped Run reopen/history and authenticated Artifact download. Every mutation rejects foreign Origin when present and never accepts client workspace/storage identity.
+- Execution eligibility is an explicit `internet_product_interview_v1` compiler. Ordinary Gate C revisions, OpenAgentSkill snapshots and install-handoff bindings return `WORKFLOW_NOT_EXECUTABLE`; the server never silently substitutes the fixed runtime for an unrelated composition.

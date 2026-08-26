@@ -245,6 +245,20 @@ export const workflowVersions = sqliteTable(
     inputSchema: text("input_schema", { mode: "json" }).$type<JsonObject>(),
     outputSchema: text("output_schema", { mode: "json" }).$type<JsonObject>(),
     graphDigest: text("graph_digest").notNull(),
+    sourceSchemaVersion: text("source_schema_version").notNull().default("gate-c-v1"),
+    sourceRevisionId: text("source_revision_id"),
+    sourceContentDigest: text("source_content_digest"),
+    sourceContractDigest: text("source_contract_digest"),
+    compositionSnapshot: text("composition_snapshot", { mode: "json" })
+      .$type<JsonObject>()
+      .notNull()
+      .default(sql`'{}'`),
+    runtimeAdapterId: text("runtime_adapter_id"),
+    runtimeAdapterVersion: text("runtime_adapter_version"),
+    runtimePlanDigest: text("runtime_plan_digest"),
+    runtimePlanSnapshot: text("runtime_plan_snapshot", { mode: "json" }).$type<JsonObject>(),
+    validationSnapshot: text("validation_snapshot", { mode: "json" }).$type<JsonObject>(),
+    parentWorkflowVersionId: text("parent_workflow_version_id"),
     createdByAccountId: text("created_by_account_id").references(
       () => accounts.id,
       { onDelete: "set null" },
@@ -538,9 +552,11 @@ export const runs = sqliteTable(
     status: text("status", {
       enum: [
         "queued",
+        "provisioning",
         "running",
-        "waiting_approval",
+        "awaiting_approval",
         "succeeded",
+        "partial_failed",
         "failed",
         "cancelled",
         "blocked",
@@ -549,12 +565,24 @@ export const runs = sqliteTable(
       .notNull()
       .default("queued"),
     idempotencyKey: text("idempotency_key"),
+    requestDigest: text("request_digest"),
     input: text("input", { mode: "json" }).$type<JsonValue>().notNull(),
     output: text("output", { mode: "json" }).$type<JsonValue>(),
     error: text("error", { mode: "json" }).$type<JsonObject>(),
     runtimePolicy: text("runtime_policy", { mode: "json" })
       .$type<JsonObject>()
       .notNull(),
+    preflightSnapshot: text("preflight_snapshot", { mode: "json" }).$type<JsonObject>(),
+    preflightDigest: text("preflight_digest"),
+    runtimeAdapterId: text("runtime_adapter_id"),
+    runtimeAdapterVersion: text("runtime_adapter_version"),
+    runtimePlanDigest: text("runtime_plan_digest"),
+    inputArtifactId: text("input_artifact_id"),
+    currentSequence: integer("current_sequence").notNull().default(0),
+    stateVersion: integer("state_version").notNull().default(0),
+    leaseToken: text("lease_token"),
+    leaseExpiresAt: text("lease_expires_at"),
+    cancelRequestedAt: text("cancel_requested_at"),
     modelProvider: text("model_provider"),
     modelId: text("model_id"),
     executionRegion: text("execution_region").notNull().default("global"),
@@ -567,6 +595,7 @@ export const runs = sqliteTable(
     tokenOutput: integer("token_output").notNull().default(0),
     costMicros: integer("cost_micros").notNull().default(0),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
     startedAt: text("started_at"),
     completedAt: text("completed_at"),
   },
@@ -586,6 +615,25 @@ export const runs = sqliteTable(
   ],
 );
 
+export const runQuotaClaims = sqliteTable(
+  "run_quota_claims",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
+    runId: text("run_id").notNull(),
+    scope: text("scope", { enum: ["active", "hour"] }).notNull(),
+    bucket: text("bucket").notNull(),
+    slot: integer("slot").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    expiresAt: text("expires_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("run_quota_scope_bucket_slot_uq").on(table.workspaceId, table.scope, table.bucket, table.slot),
+    uniqueIndex("run_quota_run_scope_uq").on(table.runId, table.scope),
+    index("run_quota_expiry_idx").on(table.expiresAt),
+  ],
+);
+
 export const runSteps = sqliteTable(
   "run_steps",
   {
@@ -596,6 +644,7 @@ export const runSteps = sqliteTable(
     workflowNodeId: text("workflow_node_id").references(() => workflowNodes.id, {
       onDelete: "set null",
     }),
+    stepKey: text("step_key").notNull(),
     sequence: integer("sequence").notNull(),
     attempt: integer("attempt").notNull().default(1),
     kind: text("kind").notNull(),
@@ -604,8 +653,9 @@ export const runSteps = sqliteTable(
       enum: [
         "queued",
         "running",
-        "waiting_approval",
+        "awaiting_approval",
         "succeeded",
+        "partial_failed",
         "failed",
         "skipped",
         "cancelled",
@@ -617,6 +667,13 @@ export const runSteps = sqliteTable(
     input: text("input", { mode: "json" }).$type<JsonValue>(),
     output: text("output", { mode: "json" }).$type<JsonValue>(),
     error: text("error", { mode: "json" }).$type<JsonObject>(),
+    skillPinSnapshot: text("skill_pin_snapshot", { mode: "json" }).$type<JsonObject>(),
+    skillManifestDigest: text("skill_manifest_digest"),
+    inputDigest: text("input_digest"),
+    outputDigest: text("output_digest"),
+    receipt: text("receipt", { mode: "json" }).$type<JsonObject>(),
+    leaseToken: text("lease_token"),
+    leaseExpiresAt: text("lease_expires_at"),
     capability: text("capability"),
     connectionId: text("connection_id").references(() => connections.id, {
       onDelete: "set null",
@@ -632,11 +689,17 @@ export const runSteps = sqliteTable(
     startedAt: text("started_at"),
     completedAt: text("completed_at"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
     uniqueIndex("run_steps_run_sequence_attempt_uq").on(
       table.runId,
       table.sequence,
+      table.attempt,
+    ),
+    uniqueIndex("run_steps_run_key_attempt_uq").on(
+      table.runId,
+      table.stepKey,
       table.attempt,
     ),
     index("run_steps_run_status_idx").on(table.runId, table.status),
@@ -658,6 +721,9 @@ export const artifacts = sqliteTable(
     }),
     kind: text("kind", { enum: ["input", "intermediate", "output", "receipt"] })
       .notNull(),
+    status: text("status", { enum: ["pending", "ready", "failed", "deleted"] })
+      .notNull()
+      .default("pending"),
     name: text("name").notNull(),
     mimeType: text("mime_type").notNull(),
     storageKey: text("storage_key").notNull(),
@@ -697,6 +763,12 @@ export const approvals = sqliteTable(
     actionPayload: text("action_payload", { mode: "json" })
       .$type<JsonObject>()
       .notNull(),
+    revision: integer("revision").notNull().default(1),
+    upstreamOutputDigest: text("upstream_output_digest").notNull().default(""),
+    payloadDigest: text("payload_digest").notNull().default(""),
+    decisionPayload: text("decision_payload", { mode: "json" }).$type<JsonObject>(),
+    decisionToken: text("decision_token"),
+    supersedesApprovalId: text("supersedes_approval_id"),
     riskLevel: text("risk_level", { enum: ["low", "medium", "high", "critical"] })
       .notNull()
       .default("medium"),
@@ -719,6 +791,11 @@ export const approvals = sqliteTable(
     decidedAt: text("decided_at"),
   },
   (table) => [
+    uniqueIndex("approvals_run_action_revision_uq").on(
+      table.runId,
+      table.actionType,
+      table.revision,
+    ),
     index("approvals_workspace_status_idx").on(table.workspaceId, table.status),
     index("approvals_run_status_idx").on(table.runId, table.status),
     index("approvals_pending_expiry_idx").on(table.status, table.expiresAt),

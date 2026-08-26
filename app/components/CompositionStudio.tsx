@@ -24,6 +24,7 @@ export type CompositionStudioBootstrap =
 type CompositionStudioProps = {
   bootstrap: CompositionStudioBootstrap;
   onBack: () => void;
+  onRun: (workflowVersionId: string) => void;
 };
 
 type Panel = "nodes" | "skills" | "changes";
@@ -210,7 +211,7 @@ function DiffPreview({ intent }: { intent: ApplyIntent }) {
   );
 }
 
-export default function CompositionStudio({ bootstrap, onBack }: CompositionStudioProps) {
+export default function CompositionStudio({ bootstrap, onBack, onRun }: CompositionStudioProps) {
   const [revision, setRevision] = useState<CompositionRevision | null>(null);
   const [history, setHistory] = useState<CompositionRevision[]>([]);
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
@@ -223,7 +224,7 @@ export default function CompositionStudio({ bootstrap, onBack }: CompositionStud
   const [intent, setIntent] = useState<ApplyIntent | null>(null);
   const [instruction, setInstruction] = useState("");
   const [constraintsDraft, setConstraintsDraft] = useState("");
-  const [pending, setPending] = useState<"bootstrap" | "recommend" | "revise" | "propose" | "validate" | null>("bootstrap");
+  const [pending, setPending] = useState<"bootstrap" | "recommend" | "revise" | "propose" | "validate" | "save" | null>("bootstrap");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [validation, setValidation] = useState<CompositionValidation | null>(null);
@@ -422,6 +423,38 @@ export default function CompositionStudio({ bootstrap, onBack }: CompositionStud
     if (!payload?.validation) return;
     setValidation(payload.validation);
     setNotice(payload.validation.valid ? "当前结构校验通过；仍然只是未保存、未运行的会话版本。" : "发现需要处理的配置问题，当前版本未被改动。");
+  }
+
+  async function saveAndRun() {
+    if (!revision || pending) return;
+    if (!validation?.valid || revision.state !== "composition_ready") {
+      setError("当前编排还有未解决的节点、权限或兼容性问题，不能保存为可运行版本。");
+      return;
+    }
+    const controller = new AbortController();
+    requestControllerRef.current = controller;
+    setPending("save");
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/workflows/composition/save", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ revision }),
+        signal: controller.signal,
+      });
+      const payload = await response.json() as { workflowVersionId?: string; error?: { code?: string; message?: string } };
+      if (!response.ok || !payload.workflowVersionId) {
+        throw new Error(payload.error?.message || "无法保存为可运行版本");
+      }
+      setNotice("服务器已保存不可变 WorkflowVersion，并完成访谈沙箱预编译。");
+      onRun(payload.workflowVersionId);
+    } catch (reason) {
+      if ((reason as Error).name !== "AbortError") setError(reason instanceof Error ? reason.message : "无法保存为可运行版本");
+    } finally {
+      if (requestControllerRef.current === controller) requestControllerRef.current = null;
+      setPending(null);
+    }
   }
 
   async function undoLatest() {
@@ -738,11 +771,11 @@ export default function CompositionStudio({ bootstrap, onBack }: CompositionStud
         </aside>
       </div>
 
-      <footer className="gc-footer"><span>当前会话修订 · 未保存 · 未运行</span><p>本阶段只做节点判断、Skill 选择与结构校验；不会连接账号、授权、安装或产出结果。</p></footer>
+      <footer className="gc-footer"><div><span>{revision.state === "composition_ready" && validation?.valid ? "结构已通过 · 可保存为真实版本" : "当前会话修订 · 尚未满足运行条件"}</span><p>保存时服务器会重新核验 Release、权限、版本摘要和访谈适配器；上游安装型 Skill 不会被偷偷执行。</p></div><button className="gc-run-button" type="button" onClick={() => void saveAndRun()} disabled={Boolean(pending) || !validation?.valid || revision.state !== "composition_ready"}>{pending === "save" ? "正在保存与预编译…" : "保存 WorkflowVersion 并试运行 ↗"}</button></footer>
 
       {(error || notice || (pending && pending !== "bootstrap")) ? (
         <div className={`gc-toast ${error ? "error" : ""}`} role={error ? "alert" : "status"} aria-live={error ? "assertive" : "polite"}>
-          <p>{error || notice || ({ recommend: "正在核对节点推荐证据…", revise: "正在生成新的会话版本…", propose: "正在把你的话转成结构化提案…", validate: "正在重新校验当前结构…" }[pending as Exclude<typeof pending, "bootstrap" | "turn" | null>] || "请求处理中…")}</p>
+          <p>{error || notice || ({ recommend: "正在核对节点推荐证据…", revise: "正在生成新的会话版本…", propose: "正在把你的话转成结构化提案…", validate: "正在重新校验当前结构…", save: "正在把当前编排保存为不可变 WorkflowVersion…" }[pending as Exclude<typeof pending, "bootstrap" | "turn" | null>] || "请求处理中…")}</p>
           {pending ? <button type="button" onClick={abortRequest}>取消请求</button> : <button type="button" onClick={() => { setError(""); setNotice(""); }}>关闭</button>}
         </div>
       ) : null}

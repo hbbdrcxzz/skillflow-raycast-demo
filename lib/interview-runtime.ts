@@ -85,12 +85,20 @@ export type InterviewAnalysisResult = {
   manualOnlyWork: string[];
 };
 
-type PrdRuntimeInput = {
+export type PrdRuntimeInput = {
   researchGoal: string;
   productContext: string;
   evidence: EvidenceItem[];
   approvedThemes: ApprovedTheme[];
   workflowNodes: WorkflowAiAssessment[];
+};
+
+export type NormalizedInterviewStepOutput = {
+  transcript: string;
+  characterCount: number;
+  lineCount: number;
+  segments: ReturnType<typeof normalizeInterviewText>["normalized_segments"];
+  warnings: string[];
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -228,6 +236,139 @@ export function normalizeInterview(raw: string): string {
     .filter((line, index, lines) => line.length > 0 || (index > 0 && lines[index - 1].length > 0))
     .join("\n")
     .trim();
+}
+
+export function runNormalizeInterviewStep(input: {
+  runId: string;
+  transcript: string;
+  researchGoal: string;
+}): { output: NormalizedInterviewStepOutput; receipt: RuntimeStepReceipt } {
+  const started = Date.now();
+  const transcript = normalizeInterview(input.transcript);
+  const normalization = normalizeInterviewText({
+    project_id: input.runId,
+    research_goal: input.researchGoal,
+    source_id: "source-001",
+    raw_text: transcript,
+    participant_label: null,
+  });
+  if (!normalization.normalized_segments.length) throw new Error("访谈材料标准化后没有可分析片段");
+  return {
+    output: {
+      transcript,
+      characterCount: transcript.length,
+      lineCount: transcript.split("\n").length,
+      segments: normalization.normalized_segments,
+      warnings: normalization.coverage.warnings,
+    },
+    receipt: deterministicStep(interviewProductManagerSkills.normalize, started, Date.now()),
+  };
+}
+
+export async function runExtractEvidenceStep(input: {
+  researchGoal: string;
+  normalized: NormalizedInterviewStepOutput;
+}): Promise<{ output: EvidenceExtractionOutput; receipt: RuntimeStepReceipt }> {
+  const skill = interviewProductManagerSkills.extractEvidence;
+  const run = await createStructuredResponse<EvidenceExtractionOutput>({
+    schemaName: "interview_evidence_v1",
+    schema: skill.outputSchema,
+    instructions: requireModelInstruction(skill.systemInstruction),
+    input: JSON.stringify({
+      research_goal: input.researchGoal,
+      research_questions: [],
+      normalized_segments: input.normalized.segments,
+    }),
+    maxOutputTokens: 5_000,
+  });
+  const output = validateEvidenceShape(run.data);
+  const errors = validateExtractedEvidence(input.normalized.segments, output);
+  if (errors.length) invalidOutput(`证据校验失败：${errors.slice(0, 3).join("；")}`);
+  return { output, receipt: modelStep(skill, run.receipt) };
+}
+
+export async function runClusterInsightsStep(input: {
+  researchGoal: string;
+  evidence: EvidenceExtractionOutput;
+}): Promise<{ output: InsightClusteringOutput; receipt: RuntimeStepReceipt }> {
+  const skill = interviewProductManagerSkills.clusterInsights;
+  const run = await createStructuredResponse<InsightClusteringOutput>({
+    schemaName: "interview_insights_v1",
+    schema: skill.outputSchema,
+    instructions: requireModelInstruction(skill.systemInstruction),
+    input: JSON.stringify({
+      research_goal: input.researchGoal,
+      evidence_items: input.evidence.evidence_items,
+      max_theme_count: 8,
+    }),
+    maxOutputTokens: 5_000,
+  });
+  const output = validateClusterShape(run.data);
+  const errors = validateClusteredInsights(input.evidence.evidence_items, output, 8);
+  if (errors.length) invalidOutput(`主题校验失败：${errors.slice(0, 3).join("；")}`);
+  return { output, receipt: modelStep(skill, run.receipt) };
+}
+
+export async function runAssessWorkflowStep(input: {
+  researchGoal: string;
+  evidence: EvidenceExtractionOutput;
+  insights: InsightClusteringOutput;
+}): Promise<{ output: WorkflowAiAssessmentOutput; receipt: RuntimeStepReceipt }> {
+  const skill = interviewProductManagerSkills.assessWorkflowAi;
+  const run = await createStructuredResponse<WorkflowAiAssessmentOutput>({
+    schemaName: "workflow_ai_assessment_v1",
+    schema: skill.outputSchema,
+    instructions: requireModelInstruction(skill.systemInstruction),
+    input: JSON.stringify({
+      research_goal: input.researchGoal,
+      themes: input.insights.themes,
+      evidence_items: input.evidence.evidence_items,
+      allowed_skill_slugs: ALLOWED_SKILL_SLUGS,
+    }),
+    maxOutputTokens: 5_000,
+  });
+  const output = validateWorkflowShape(run.data);
+  const errors = validateWorkflowAiAssessment(output, input.evidence.evidence_items, [...ALLOWED_SKILL_SLUGS]);
+  if (errors.length) invalidOutput(`工作流校验失败：${errors.slice(0, 3).join("；")}`);
+  return { output, receipt: modelStep(skill, run.receipt) };
+}
+
+export async function runGeneratePrdStep(input: PrdRuntimeInput): Promise<{
+  output: PrdGenerationOutput;
+  receipt: RuntimeStepReceipt;
+}> {
+  const skill = interviewProductManagerSkills.generatePrd;
+  const run = await createStructuredResponse<PrdGenerationOutput>({
+    schemaName: "evidence_backed_prd_v1",
+    schema: skill.outputSchema,
+    instructions: requireModelInstruction(skill.systemInstruction),
+    input: JSON.stringify({
+      product_name: input.productContext || "待命名产品",
+      research_goal: input.researchGoal,
+      approved_themes: input.approvedThemes,
+      evidence_items: input.evidence,
+      constraints: input.productContext ? [`产品背景：${input.productContext}`] : [],
+      known_metrics: [],
+      requested_detail: "review_ready",
+    }),
+    maxOutputTokens: 7_000,
+  });
+  return { output: validatePrdShape(run.data), receipt: modelStep(skill, run.receipt) };
+}
+
+export function runPrdQualityStep(input: {
+  prd: PrdGenerationOutput;
+  approvedThemeIds: string[];
+  evidenceIds: string[];
+}): { quality: PrdQualityOutput; markdown: string; receipt: RuntimeStepReceipt } {
+  const started = Date.now();
+  const quality = runPrdQualityChecks(input.prd, input.approvedThemeIds, input.evidenceIds);
+  const markdown = renderPrdMarkdown(input.prd, quality);
+  return {
+    quality,
+    markdown,
+    receipt: deterministicStep(interviewProductManagerSkills.qualityReview, started, Date.now()),
+  };
 }
 
 export async function analyzeInterview(input: { transcript: string; researchGoal: string }) {
@@ -369,8 +510,17 @@ export async function generatePrd(input: PrdRuntimeInput) {
   return { ...prdResult, quality, markdown, receipt: finishReceipt(runId, runStarted, steps) };
 }
 
+function markdownText(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/([\\`*_{}\u005B\u005D()#+.!|>~\u002D])/g, "\\$1")
+    .replace(/\b(?:javascript|vbscript|data)\s*:/gi, (protocol) => `${protocol.slice(0, -1)}\\:`);
+}
+
 function list(items: string[]): string {
-  return items.length ? items.map((item) => `- ${item}`).join("\n") : "- 无";
+  return items.length ? items.map((item) => `- ${markdownText(item)}`).join("\n") : "- 无";
 }
 
 export function renderPrdMarkdown(result: PrdGenerationOutput, quality: PrdQualityOutput): string {
@@ -378,14 +528,17 @@ export function renderPrdMarkdown(result: PrdGenerationOutput, quality: PrdQuali
   const requirements = prd.requirements
     .map(
       (requirement) =>
-        `### ${requirement.requirement_id} · ${requirement.statement}（${requirement.priority}）\n\n${requirement.rationale}\n\n验收标准：\n${list(requirement.acceptance_criteria)}\n\n证据：${requirement.evidence_ids.map((id) => `\`${id}\``).join("、")}`,
+        `### ${markdownText(requirement.requirement_id)} · ${markdownText(requirement.statement)}（${markdownText(requirement.priority)}）\n\n${markdownText(requirement.rationale)}\n\n验收标准：\n${list(requirement.acceptance_criteria)}\n\n证据：${requirement.evidence_ids.map((id) => `\`${markdownText(id).replace(/`/g, "&#96;")}\``).join("、")}`,
     )
     .join("\n\n");
   const metrics = prd.success_metrics.map(
-    (metric) => `- ${metric.metric}：${metric.definition}；目标 ${metric.target ?? "待确认"}；周期 ${metric.timeframe ?? "待确认"}`,
+    (metric) => `- ${markdownText(metric.metric)}：${markdownText(metric.definition)}；目标 ${markdownText(metric.target ?? "待确认")}；周期 ${markdownText(metric.timeframe ?? "待确认")}`,
   );
-  const risks = prd.risks.map((item) => `- ${item.risk}；缓解：${item.mitigation}`);
-  return `# ${prd.title}\n\n> 质量检查：${quality.decision} · ${quality.score}/100\n\n## 背景\n\n${prd.background}\n\n## 问题定义\n\n${prd.problem_statement}\n\n## 目标\n\n${prd.goal}\n\n## 目标用户\n\n${list(prd.target_users)}\n\n## 用户场景\n\n${list(prd.user_scenarios)}\n\n## 非目标\n\n${list(prd.non_goals)}\n\n## 功能需求\n\n${requirements}\n\n## 成功指标\n\n${list(metrics)}\n\n## 风险与边界\n\n${list(risks)}\n\n## 验证顺序\n\n${prd.rollout_plan.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n\n## 开放问题\n\n${list(result.open_questions)}\n\n## 待验证假设\n\n${list(result.assumptions_to_validate)}\n`;
+  const risks = prd.risks.map((item) => `- ${markdownText(item.risk)}；缓解：${markdownText(item.mitigation)}`);
+  const qualityIssues = quality.issues.length
+    ? quality.issues.map((issue) => `- ${markdownText(issue.severity)} · ${markdownText(issue.location)}：${markdownText(issue.reason)}；建议：${markdownText(issue.suggested_fix)}`).join("\n")
+    : "- 未发现阻断问题";
+  return `# ${markdownText(prd.title)}\n\n> 质量检查：${markdownText(quality.decision)} · ${quality.score}/100\n\n## 背景\n\n${markdownText(prd.background)}\n\n## 问题定义\n\n${markdownText(prd.problem_statement)}\n\n## 目标\n\n${markdownText(prd.goal)}\n\n## 目标用户\n\n${list(prd.target_users)}\n\n## 用户场景\n\n${list(prd.user_scenarios)}\n\n## 非目标\n\n${list(prd.non_goals)}\n\n## 功能需求\n\n${requirements}\n\n## 成功指标\n\n${list(metrics)}\n\n## 风险与边界\n\n${list(risks)}\n\n## 验证顺序\n\n${prd.rollout_plan.map((item, index) => `${index + 1}. ${markdownText(item)}`).join("\n")}\n\n## 开放问题\n\n${list(result.open_questions)}\n\n## 待验证假设\n\n${list(result.assumptions_to_validate)}\n\n## 质量问题\n\n${qualityIssues}\n`;
 }
 
 export function validateAnalysisInput(body: unknown): { transcript: string; researchGoal: string } {

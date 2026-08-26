@@ -6,6 +6,7 @@ import RegistryBrowser from "@/app/components/RegistryBrowser";
 import InterviewRunner from "@/app/components/InterviewRunner";
 import WorkflowInterview from "@/app/components/WorkflowInterview";
 import CompositionStudio, { type CompositionStudioBootstrap } from "@/app/components/CompositionStudio";
+import CommandHome from "@/app/components/CommandHome";
 
 type Stage = "home" | "catalog" | "diagnose" | "compose" | "routes" | "runner" | "lens" | "dashboard";
 
@@ -29,6 +30,8 @@ export default function Home() {
   const [task, setTask] = useState("整理本周项目进度，生成管理层周报");
   const [interviewSeed, setInterviewSeed] = useState("");
   const [compositionBootstrap, setCompositionBootstrap] = useState<CompositionStudioBootstrap | null>(null);
+  const [runnerWorkflowVersionId, setRunnerWorkflowVersionId] = useState<string | null>(null);
+  const [resumeRunId, setResumeRunId] = useState<string | null>(null);
   const [commandOpen, setCommandOpen] = useState(false);
   const [lens, setLens] = useState(42);
   const [adjustment, setAdjustment] = useState("只保留三个关键数字，结论改成管理层语言");
@@ -273,7 +276,7 @@ export default function Home() {
               }} />
             )}
 
-            {stage === "runner" && <InterviewRunner onBack={() => setStage("routes")} />}
+            {stage === "runner" && <InterviewRunner workflowVersionId={runnerWorkflowVersionId} initialRunId={resumeRunId} onBack={() => setStage("dashboard")} />}
 
             {stage === "diagnose" && (
               <WorkflowInterview
@@ -291,6 +294,11 @@ export default function Home() {
               <CompositionStudio
                 bootstrap={compositionBootstrap}
                 onBack={() => setStage(compositionBootstrap.kind === "registry_single" ? "catalog" : "home")}
+                onRun={(workflowVersionId) => {
+                  setRunnerWorkflowVersionId(workflowVersionId);
+                  setResumeRunId(null);
+                  setStage("runner");
+                }}
               />
             )}
 
@@ -373,11 +381,11 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="route-actions">
-                    <button className="ghost" disabled>保存（尚未开放）</button>
+                    <button className="ghost" onClick={() => setStage("dashboard")}>查看真实运行记录</button>
                     {workflowPlan?.candidateSkill?.sourceUrl ? (
                       <a className="primary" href={workflowPlan.candidateSkill.sourceUrl} target="_blank" rel="noreferrer">查看原作者说明 <span>↗</span></a>
                     ) : canRunInterview ? (
-                      <button className="primary" onClick={() => setStage("runner")}>上传材料并真实运行 <span>↗</span></button>
+                      <button className="primary" onClick={() => { setInterviewSeed(task); setStage("diagnose"); }}>先确认工作流并选择 Skill <span>↗</span></button>
                     ) : canViewWeeklySample ? (
                       <button className="primary" onClick={() => setStage("lens")}>查看官方预制样例 <span>↗</span></button>
                     ) : workflowPlan?.state === "needs_configuration" ? (
@@ -446,26 +454,11 @@ export default function Home() {
               </div>
             )}
 
-            {stage === "dashboard" && (
-              <div className="dashboard-layout stage-enter">
-                <aside className="dash-sidebar">
-                  <button className="new-task" onClick={() => setStage("home")}>＋ 新建任务</button>
-                  <span>工作空间</span>
-                  <button className="active">◫ 空工作台</button><button disabled>⌘ 工作流 · 待持久化</button><button disabled>◇ 已启用 Skill · 暂无</button><button disabled>↗ 运行记录 · 暂无</button>
-                  <span>当前状态</span>
-                  <button disabled>没有已保存内容</button>
-                </aside>
-                <div className="dash-main">
-                  <div className="dash-head"><div><small>我的空间 · 真实空状态</small><h2>完成一次真实运行并保存后，工作对象才会出现在这里。</h2></div><button className="primary" onClick={() => setStage("home")}>返回发现</button></div>
-                  <div className="workspace-empty">
-                    <span>⌁</span>
-                    <strong>目前没有已保存的工作流或运行结果</strong>
-                    <p>当前版本不会用演示数据伪装成你的历史记录。Gate D 接入真实持久化后，这里会显示需要确认的任务、真实 Artifact、已保存工作流和已启用 Skill。</p>
-                    <button className="ghost" onClick={() => setStage("catalog")}>先去真实 Skill 商店</button>
-                  </div>
-                </div>
-              </div>
-            )}
+            {stage === "dashboard" && <CommandHome
+              onNew={() => setStage("home")}
+              onOpen={(runId) => { setResumeRunId(runId); setRunnerWorkflowVersionId(null); setStage("runner"); }}
+              onOpenWorkflow={(workflowVersionId) => { setRunnerWorkflowVersionId(workflowVersionId); setResumeRunId(null); setStage("runner"); }}
+            />}
           </section>
         </section>
       )}

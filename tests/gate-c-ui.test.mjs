@@ -5,13 +5,14 @@ import test from "node:test";
 const componentPath = new URL("../app/components/CompositionStudio.tsx", import.meta.url);
 const stylesPath = new URL("../app/globals.css", import.meta.url);
 
-test("Gate C UI keeps composition session-only and never exposes execution or persistence actions", async () => {
+test("Gate C stays session-only until Gate D performs a server-side save and adapter compile", async () => {
   const source = await readFile(componentPath, "utf8");
   assert.match(source, /当前会话修订/);
   assert.match(source, /未保存 · 未运行/);
-  assert.match(source, /不会连接账号、授权、安装或产出结果/);
-  assert.doesNotMatch(source, />\s*(?:运行|保存|安装)(?: Skill)?\s*</);
-  assert.doesNotMatch(source, /\/api\/workflows\/composition\/(?:run|save|install)/);
+  assert.match(source, /\/api\/workflows\/composition\/save/);
+  assert.match(source, /保存 WorkflowVersion 并试运行/);
+  assert.match(source, /服务器会重新核验 Release、权限、版本摘要和访谈适配器/);
+  assert.doesNotMatch(source, /\/api\/workflows\/composition\/(?:run|install)/);
 });
 
 test("Gate C UI supports both confirmed diagnosis and Registry single-Skill bootstrap", async () => {

@@ -123,3 +123,66 @@
 ### Boundary Before Gate C
 - The implementation is ready for user acceptance, but a deployed environment must have server-side `OPENAI_API_KEY` and `OPENAI_MODEL` configured before live inference can run. Without them, the intended honest 503/retry state is shown.
 - Do not start concrete Skill recommendation, node binding, replacement, versioning or sandbox execution until the user approves Gate B and explicitly authorizes Gate C.
+
+## Session: 2026-08-25 — Gate D Genuine Sandbox Loop
+
+### Current Status
+- **Phase:** Gate D contract freeze and architecture audit
+- **State:** User approved Gate D implementation after Gate C passed independent Red Team review and was privately deployed as Sites version 7.
+
+### Frozen Outcome
+- One authenticated product/operations user can persist a Gate C composition, submit pasted or `.txt`/`.md` interview material, pass preflight, run the allowlisted interview-to-PRD workflow, approve evidence/themes, receive a real Markdown artifact and receipt, and reopen the run after refresh.
+- No arbitrary third-party script execution, connector writes, fake progress, canned success or browser-local persistence claims are permitted.
+
+### Actions Taken
+- Re-read repository instructions, production decisions, prior gate contracts and the current runtime/persistence findings before code changes.
+- Added the Gate D acceptance contract and frozen boundaries to the persistent project plan.
+- Started independent product, persistence/runtime and Red Team baseline audits; subagents are read-only and cannot edit or deploy the Site.
+- Product audit confirmed the runtime logic is reusable but the durable user loop is absent; it supplied the state-by-state UX acceptance matrix.
+- Red Team baseline identified six P0 classes: identity collision, client-forged approval/evidence, object-level authorization, concurrent/idempotent execution, Release/adapter drift and D1/R2 split-brain. These are now implementation blockers, not backlog suggestions.
+
+### Next
+- Audit current schema, authentication, Gate C revision handoff, runtime APIs and runner UI; then publish the schema/API plan before implementation as required by repository instructions.
+
+### Errors
+- The Sites capability references were initially addressed under `skills/references`; filesystem discovery showed they live under `skills/sites-building/references`. Corrected the path without changing product code.
+- The first repository file scan looked for a `migrations/` directory that does not exist. Drizzle migration files were found under `drizzle/`; no repeated scan of the wrong path.
+- `apply_patch` does not allow delete and add operations for the same file in one patch. Replaced `InterviewRunner.tsx` with two explicit operations.
+- The first Gate D lint pass reported unused imports and synchronous state writes inside effects. Removed those patterns before the next verification pass.
+- A direct Miniflare harness against the generated production bundle could not parse Vinext's generated static JavaScript module shape. Switched to the supported `vinext dev` path rather than weakening the bundle or inventing a second runtime.
+- The first local authenticated workspace request found an empty local D1 database. Stopped the dev process, applied the inspected `0000` and `0001` migrations to the exact local Miniflare database, then restarted; workspace bootstrap returned 201.
+
+### Implemented Runtime Foundation
+- Replaced the lossy account/workspace ID derivation with SHA-256 identities of the complete platform user ID. A live collision check using `a/b` and `a?b` now produces distinct private workspaces.
+- Added persisted Gate C WorkflowVersions, a strict built-in interview adapter, one durable Run aggregate, seven step attempts, digest-bound approvals, D1 metadata plus R2 bytes, authenticated artifact download, cancellation, retry and Command Home reopen APIs.
+- Removed the old stateless `/analyze` and `/prd` success paths with an explicit 410 contract so clients can no longer submit forged evidence or fabricate a human approval receipt.
+- Corrected Run provisioning order: the non-runnable Run aggregate is now created before its input Artifact, then input metadata and all seven steps commit as a D1 batch. Duplicate submissions reuse one client-stable idempotency key and request digest.
+- Added a decision token and batched approval transition so only the exact pending payload can advance the approval step and Run. Step completion now requires both the Run lease and step lease, and commits both relational states in one D1 batch after R2 digest verification.
+- Sanitized generated Markdown fields against raw HTML and active URI schemes while keeping the source as a downloadable UTF-8 `.md` attachment.
+- Generated and inspected `drizzle/0001_mute_rage.sql` and `drizzle/0002_overjoyed_night_nurse.sql`; current lint and production build pass.
+
+### Gate D Verification So Far
+- Full local HTTP contract smoke passed through Gate B handoff → Gate C native binding and permission acknowledgement → persisted WorkflowVersion → Run creation → seven step attempts → digest-bound approval → quality-reviewed Markdown Artifact → authenticated download → history/reopen.
+- The passing real D1/R2 smoke produced Run `run_e077846a-1bd2-46fc-9ab4-97e12b43396f` with seven steps and Artifact `art_3fe2f81e-435f-46e0-9492-4681b4a83aad`. These IDs refer only to local Miniflare test data, not a production run.
+- Negative smoke passed for exact idempotent replay, idempotency conflict, cross-workspace Run and Artifact 404, stale approval digest, approval replay, cancel followed by late advance, and malicious Markdown title/background neutralization.
+- The local model was a deterministic schema-contract stub. It proves orchestration and validators, not model quality. It was removed after testing; the app was restarted without credentials and returned `configured:false` plus honest `MODEL_NOT_CONFIGURED` 503.
+- Browser QA passed at 1440×900, 1024×768, 768×1024 and 390×844 with zero horizontal overflow, visible reading text ≥12px and control text ≥14px. A mobile touch-target audit found several 32–42px controls; the CSS now raises critical mobile controls to a 44px target and the delta was rechecked.
+- Final serial verification is 65/65 tests PASS plus lint, production build and `git diff --check` PASS.
+
+### Additional Errors Resolved
+- The first permanent-version save reused Gate C's session-local revision number and collided across sessions. Persistent versions now use a server-generated monotonic `Vn`, while identity combines the composition graph and frozen runtime plan.
+- The first Run provisioning batch inserted all seven wide step rows in one SQL statement and exceeded D1's variable limit. The same atomic batch now uses three bounded insert chunks.
+- The first workflow-assessment contract stub emitted a non-allowlisted Skill slug. The runtime validator correctly failed the step and preserved partial state; the fixture was corrected and a new attempt recovered successfully.
+- The first Gate D boundary-test draft imported identity routes in Node and reached the `cloudflare:` module scheme. Replaced that unsupported harness with source-boundary assertions; D1/R2 behavior remains covered by the real local HTTP smoke.
+## 2026-08-26 Gate D Candidate
+
+- Replaced the stateless analyze/PRD success paths with authenticated WorkflowVersion save, server-owned run/step states, immutable approvals, workspace-scoped artifacts and Command Home history/reopen.
+- Compiled the one executable MVP adapter into seven exact pinned stages: normalization, evidence extraction, insight clustering, node-level AI/Skill assessment, human approval, PRD generation and deterministic quality review. Arbitrary third-party scripts and external writes remain disabled.
+- Added D1 migrations for runtime state and atomic quota claims, including a unique run/scope claim so a completed run cannot bypass the three-active-run ceiling when approval is reopened.
+- Added D1→R2 pending/verify/CAS commit semantics, literal quote grounding, bounded fatal-UTF8 requests, Markdown neutralization, provider-error redaction, hashed account identity and non-enumerating cross-workspace access control.
+- Added approval expiry rotation, evidence/theme edits and additions, approval revision reopen, downstream supersession, lease expiry recovery, append-only retry attempts, cancellation guards, provisioning crash recovery and full quality-report receipt artifacts.
+- Verification passed: lint, production build, 66/66 automated tests, migration-from-legacy test, diff check, 390 px browser layout check, and local HTTP/D1/R2 smoke covering idempotency, approval replay/expiry, identity collision, CSRF, invalid UTF-8, active quota, malformed-model retry, lease expiry, upstream-error canary redaction and stale provisioning recovery.
+- Local development model credentials were removed and test processes stopped after verification. No commit, push or deployment was performed. Independent Red Team review and hosted real-model execution remain the two acceptance boundaries.
+- Second Red Team delta fixed five P1s: manual-theme-only approval, cancellable interrupted provisioning, expiry inside the approval CAS, Vn approved-analysis hydration into Vn+1 with a distinct revision digest, and cross-isolate Gate D persistence validation without weakening Gate C mutation sessions. Active-run claims now persist until a terminal transition rather than expiring after 24 hours.
+- Final verification after those fixes passed lint, production build, 67/67 automated tests, diff check and the extended local HTTP/D1/R2 smoke. The smoke additionally asserts prior human-added themes reopen, approval revision digests differ, and a provisioning Run can be cancelled after refresh-style state loss. Temporary mock credentials and both local processes were removed again.
+- Final Red Team found one last quota-leak ordering issue; the implementation now validates the prior approved Artifact and computes the revision digest before claiming an active slot, with the claim immediately enclosed by exact-ID failure cleanup. A new executable smoke corrupts the approved Artifact reference, verifies reopen fails before claiming quota, then proves all three active slots remain available. The final independent delta verdict is P0=0, P1=0, code/local contract PASS. No commit, push or deployment has occurred; hosted real-model acceptance is still explicitly open.

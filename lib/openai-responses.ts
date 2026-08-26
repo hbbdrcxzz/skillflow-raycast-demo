@@ -4,6 +4,7 @@ const DEFAULT_TIMEOUT_MS = 45_000;
 type RuntimeEnvironment = {
   OPENAI_API_KEY?: string;
   OPENAI_MODEL?: string;
+  SKILLFLOW_TEST_OPENAI_RESPONSES_URL?: string;
 };
 
 export type JsonSchema = Record<string, unknown>;
@@ -91,6 +92,18 @@ function requiredConfiguration() {
   return { apiKey: runtimeEnv.OPENAI_API_KEY!.trim(), model: runtimeEnv.OPENAI_MODEL!.trim() };
 }
 
+function responsesUrl(): string {
+  const runtimeEnv = process.env as RuntimeEnvironment & { NODE_ENV?: string };
+  const localTestUrl = runtimeEnv.SKILLFLOW_TEST_OPENAI_RESPONSES_URL?.trim();
+  if (!localTestUrl) return OPENAI_RESPONSES_URL;
+  const parsed = new URL(localTestUrl);
+  const isLocal = parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost";
+  if (runtimeEnv.NODE_ENV === "production" || parsed.protocol !== "http:" || !isLocal) {
+    throw new ModelGatewayError("MODEL_NOT_CONFIGURED", "本地模型测试地址仅允许在开发环境使用 loopback HTTP", 503);
+  }
+  return parsed.toString();
+}
+
 function numericToken(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
 }
@@ -115,14 +128,10 @@ function outputText(response: OpenAIResponse): string | null {
   return chunks.length ? chunks.join("") : null;
 }
 
-async function safeErrorMessage(response: Response): Promise<string> {
-  try {
-    const body = (await response.json()) as { error?: { message?: unknown } };
-    if (typeof body.error?.message === "string") return body.error.message.slice(0, 240);
-  } catch {
-    // The upstream response may be non-JSON. Never echo the full body to clients.
-  }
-  return `OpenAI Responses API 返回 HTTP ${response.status}`;
+function safeErrorMessage(response: Response): string {
+  return response.status === 429
+    ? "模型服务当前请求较多，请稍后重试"
+    : `模型服务暂时不可用（HTTP ${response.status}）`;
 }
 
 export async function createStructuredResponse<T>(
@@ -139,7 +148,7 @@ export async function createStructuredResponse<T>(
 
   let upstream: Response;
   try {
-    upstream = await fetchImpl(OPENAI_RESPONSES_URL, {
+    upstream = await fetchImpl(responsesUrl(), {
       method: "POST",
       headers: {
         authorization: `Bearer ${apiKey}`,
@@ -172,7 +181,7 @@ export async function createStructuredResponse<T>(
   }
 
   if (!upstream.ok) {
-    const message = await safeErrorMessage(upstream);
+    const message = safeErrorMessage(upstream);
     throw new ModelGatewayError("MODEL_UPSTREAM_ERROR", message, upstream.status === 429 ? 429 : 502);
   }
 
@@ -184,8 +193,7 @@ export async function createStructuredResponse<T>(
   }
 
   if (response.error) {
-    const message = typeof response.error.message === "string" ? response.error.message.slice(0, 240) : "模型运行失败";
-    throw new ModelGatewayError("MODEL_UPSTREAM_ERROR", message, 502);
+    throw new ModelGatewayError("MODEL_UPSTREAM_ERROR", "模型服务报告运行失败，请稍后重试", 502);
   }
 
   const rawText = outputText(response);

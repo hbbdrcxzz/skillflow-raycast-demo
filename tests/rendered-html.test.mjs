@@ -290,7 +290,7 @@ test("public Skill registry is honest about E0 evidence and hides internal licen
   assert.doesNotMatch(JSON.stringify(body), /commercial_use_status|internal_tier/i);
 });
 
-test("real runtime refuses to fake results when the server model is not configured", async () => {
+test("legacy anonymous analyze endpoint is removed instead of impersonating a persisted run", async () => {
   const app = await worker();
   const restoreEnv = setServerModelEnv(undefined, undefined);
   try {
@@ -302,14 +302,14 @@ test("real runtime refuses to fake results when the server model is not configur
       env(),
       ctx(),
     );
-    assert.equal(response.status, 503);
-    assert.equal((await response.json()).error.code, "MODEL_NOT_CONFIGURED");
+    assert.equal(response.status, 410);
+    assert.equal((await response.json()).error.code, "LEGACY_RUNTIME_REMOVED");
   } finally {
     restoreEnv();
   }
 });
 
-test("real runtime executes registered Skills and returns evidence-backed workflow advice", async () => {
+test("legacy analyze cannot spend model tokens or return a second source of truth", async () => {
   const app = await worker();
   const originalFetch = globalThis.fetch;
   const restoreEnv = setServerModelEnv("server-only-test-key", "test-model");
@@ -409,17 +409,10 @@ test("real runtime executes registered Skills and returns evidence-backed workfl
       env(),
       ctx(),
     );
-    assert.equal(response.status, 201);
+    assert.equal(response.status, 410);
     const body = await response.json();
-    assert.equal(body.analysis.evidence[0].evidence_id, "ev-001");
-    assert.equal(body.analysis.workflowNodes[0].ai_decision, "ai_first");
-    assert.equal(body.receipt.steps.length, 4);
-    assert.equal(body.receipt.usage.totalTokens, 180);
-    assert.equal(upstreamRequests.length, 3);
-    assert.ok(upstreamRequests.every((item) => item.url === "https://api.openai.com/v1/responses"));
-    assert.ok(upstreamRequests.every((item) => item.options.headers.authorization === "Bearer server-only-test-key"));
-    assert.ok(upstreamRequests.every((item) => item.body.store === false));
-    assert.ok(upstreamRequests.every((item) => item.body.text.format.type === "json_schema"));
+    assert.equal(body.error.code, "LEGACY_RUNTIME_REMOVED");
+    assert.equal(upstreamRequests.length, 0);
     assert.doesNotMatch(JSON.stringify(body), /server-only-test-key/);
   } finally {
     globalThis.fetch = originalFetch;
@@ -427,7 +420,7 @@ test("real runtime executes registered Skills and returns evidence-backed workfl
   }
 });
 
-test("runtime rejects model quotes that do not exist in the source", async () => {
+test("legacy analyze cannot be used to bypass persisted quote validation", async () => {
   const app = await worker();
   const originalFetch = globalThis.fetch;
   const restoreEnv = setServerModelEnv("server-only-test-key", "test-model");
@@ -465,15 +458,15 @@ test("runtime rejects model quotes that do not exist in the source", async () =>
       env(),
       ctx(),
     );
-    assert.equal(response.status, 502);
-    assert.equal((await response.json()).error.code, "MODEL_OUTPUT_INVALID");
+    assert.equal(response.status, 410);
+    assert.equal((await response.json()).error.code, "LEGACY_RUNTIME_REMOVED");
   } finally {
     globalThis.fetch = originalFetch;
     restoreEnv();
   }
 });
 
-test("confirmed themes generate a structured PRD, quality report and Markdown", async () => {
+test("legacy PRD endpoint rejects client-supplied evidence and fake approval", async () => {
   const app = await worker();
   const originalFetch = globalThis.fetch;
   const restoreEnv = setServerModelEnv("server-only-test-key", "test-model");
@@ -576,14 +569,9 @@ test("confirmed themes generate a structured PRD, quality report and Markdown", 
       env(),
       ctx(),
     );
-    assert.equal(response.status, 201);
+    assert.equal(response.status, 410);
     const body = await response.json();
-    assert.equal(body.prd.requirements[0].evidence_ids[0], "ev-001");
-    assert.match(body.markdown, /# 证据驱动的访谈分析/);
-    assert.match(body.markdown, /`ev-001`/);
-    assert.equal(body.quality.decision, "pass_with_notes");
-    assert.equal(body.receipt.usage.totalTokens, 130);
-    assert.equal(body.receipt.steps.length, 3);
+    assert.equal(body.error.code, "LEGACY_RUNTIME_REMOVED");
   } finally {
     globalThis.fetch = originalFetch;
     restoreEnv();
