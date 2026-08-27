@@ -70,7 +70,7 @@ type GateBBootstrapInput = {
 };
 
 type RegistryBootstrapInput = {
-  source: { kind: "registry_single"; slug: string; taskContext?: string };
+  source: { kind: "registry_single"; source?: "openagentskill" | "skillflow_creator"; slug: string; releaseId?: string; expectedManifestDigest?: string; taskContext?: string };
 };
 
 type BootstrapInput = GateBBootstrapInput | RegistryBootstrapInput;
@@ -524,7 +524,8 @@ export async function bootstrapComposition(value: unknown): Promise<CompositionR
   }
   if (sourceInput.kind === "registry_single") {
     const slug = cleanText(sourceInput.slug, "source.slug", 120);
-    const release = await resolveRelease({ source: "openagentskill", slug });
+    const releaseSource = sourceInput.source === "skillflow_creator" ? "skillflow_creator" : "openagentskill";
+    const release = await resolveRelease({ source: releaseSource, slug, releaseId: sourceInput.releaseId, expectedManifestDigest: sourceInput.expectedManifestDigest });
     const taskContext = typeof sourceInput.taskContext === "string" && sourceInput.taskContext.trim()
       ? sourceInput.taskContext.trim().slice(0, 1_000)
       : `评估并配置 ${release.canonicalName}；具体输入、输出和验收仍待用户补充。`;
@@ -859,6 +860,7 @@ async function validateResolvedRevision(revision: CompositionRevision): Promise<
       await resolveRelease({
         source: binding.binding.release.source,
         slug: binding.binding.release.slug,
+        releaseId: binding.binding.release.releaseId,
         expectedManifestDigest: binding.binding.release.manifestDigest,
       });
     } catch (error) {

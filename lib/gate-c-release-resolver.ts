@@ -323,6 +323,15 @@ export async function resolveRelease(selector: ReleaseSelector): Promise<Release
       const status = error instanceof RegistryUpstreamError ? error.status : 502;
       throw new ReleaseResolutionError("REGISTRY_UNAVAILABLE", error instanceof Error ? error.message : "上游 Registry 不可用", status);
     }
+  } else if (selector.source === "skillflow_creator") {
+    if (!selector.releaseId || !/^release_[A-Za-z0-9_:-]{8,240}$/.test(selector.releaseId)) throw new ReleaseResolutionError("INVALID_RELEASE_SELECTOR", "创作者 Skill 必须携带不可变 Release ID", 400);
+    try {
+      const { resolveCreatorReleasePin } = await import("./creator-release-pin");
+      release = await resolveCreatorReleasePin(selector.slug, selector.releaseId);
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && "httpStatus" in error) throw error;
+      throw new ReleaseResolutionError("RELEASE_NOT_FOUND", error instanceof Error ? error.message : "没有找到这个公开创作者 Release", 404);
+    }
   } else {
     throw new ReleaseResolutionError("INVALID_RELEASE_SELECTOR", "不支持的 Release 来源", 400);
   }
@@ -338,8 +347,14 @@ export async function searchReleasePins(task: string, limit = 8): Promise<{
   registryError: string | null;
 }> {
   const native = await nativeReleasePins();
-  let registry: ReleasePin[] = [];
+  const registry: ReleasePin[] = [];
   let registryError: string | null = null;
+  try {
+    const { searchCreatorReleasePins } = await import("./creator-release-pin");
+    registry.push(...await searchCreatorReleasePins(task, limit));
+  } catch (error) {
+    registryError = `创作者目录暂不可用：${error instanceof Error ? error.message : "数据库不可用"}`;
+  }
   try {
     const params = new URLSearchParams({ task: task.slice(0, 600), limit: String(Math.max(1, Math.min(limit, 12))) });
     const payload = await fetchRegistryJson<{ skills?: unknown[] }>(`/api/skills/search?${params.toString()}`);
@@ -348,11 +363,11 @@ export async function searchReleasePins(task: string, limit = 8): Promise<{
       .filter((slug) => safeRegistrySlug(slug))
       .slice(0, 12);
     const settled = await Promise.allSettled(slugs.map((slug) => resolveRelease({ source: "openagentskill", slug })));
-    registry = settled.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+    registry.push(...settled.flatMap((result) => result.status === "fulfilled" ? [result.value] : []));
     const rejected = settled.filter((result) => result.status === "rejected").length;
-    if (rejected) registryError = `${rejected} 个 Registry 候选无法完成权威 Release 解析`;
+    if (rejected) registryError = [registryError, `${rejected} 个 Registry 候选无法完成权威 Release 解析`].filter(Boolean).join("；");
   } catch (error) {
-    registryError = error instanceof Error ? error.message : "上游 Registry 不可用";
+    registryError = [registryError, error instanceof Error ? error.message : "上游 Registry 不可用"].filter(Boolean).join("；");
   }
   return { native, registry, registryError };
 }

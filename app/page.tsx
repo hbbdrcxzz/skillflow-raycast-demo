@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { WorkflowPlan } from "@/lib/contracts";
-import RegistryBrowser from "@/app/components/RegistryBrowser";
+import RegistryBrowser, { type RegistrySkill } from "@/app/components/RegistryBrowser";
 import InterviewRunner from "@/app/components/InterviewRunner";
 import WorkflowInterview from "@/app/components/WorkflowInterview";
 import CompositionStudio, { type CompositionStudioBootstrap } from "@/app/components/CompositionStudio";
 import CommandHome from "@/app/components/CommandHome";
+import CreatorStudio from "@/app/components/CreatorStudio";
 
-type Stage = "home" | "catalog" | "diagnose" | "compose" | "routes" | "runner" | "lens" | "dashboard";
+type Stage = "home" | "catalog" | "creator" | "diagnose" | "compose" | "routes" | "runner" | "lens" | "dashboard";
 
 type SelectedRegistrySkill = {
   slug: string;
@@ -30,6 +31,7 @@ export default function Home() {
   const [task, setTask] = useState("整理本周项目进度，生成管理层周报");
   const [interviewSeed, setInterviewSeed] = useState("");
   const [compositionBootstrap, setCompositionBootstrap] = useState<CompositionStudioBootstrap | null>(null);
+  const [creatorFork, setCreatorFork] = useState<RegistrySkill | null>(null);
   const [runnerWorkflowVersionId, setRunnerWorkflowVersionId] = useState<string | null>(null);
   const [resumeRunId, setResumeRunId] = useState<string | null>(null);
   const [commandOpen, setCommandOpen] = useState(false);
@@ -47,6 +49,7 @@ export default function Home() {
       { icon: "↗", title: "直接开始这项任务", note: task || "描述一项工作", action: "diagnose" as const },
       { icon: "⌕", title: "匹配一个 Skill", note: "进入真实目录，按任务搜索与比较", action: "catalog" as const },
       { icon: "✦", title: "帮我发现可交给 AI 的工作", note: "用自然语言梳理工作，AI 只追问关键缺口", action: "discover" as const },
+      { icon: "◇", title: "创建或修改一个 Skill", note: "粘贴、自然语言创建，或审阅 AI 修改 Diff", action: "creator" as const },
     ],
     [task],
   );
@@ -54,6 +57,7 @@ export default function Home() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        if (stage === "creator") return;
         event.preventDefault();
         setStage("home");
         setCommandOpen(true);
@@ -61,7 +65,7 @@ export default function Home() {
         window.setTimeout(() => inputRef.current?.focus(), 40);
       }
       if (event.key === "Escape") {
-        if (stage === "diagnose" || stage === "compose") return;
+        if (stage === "diagnose" || stage === "compose" || stage === "creator") return;
         if (stage !== "home") setStage("home");
         else setCommandOpen(false);
       }
@@ -83,6 +87,9 @@ export default function Home() {
             setCompositionBootstrap(null);
             setInterviewSeed("");
             setStage("diagnose");
+          } else if (target === "creator") {
+            setCreatorFork(null);
+            setStage("creator");
           } else {
             if (target === "diagnose") {
               setCompositionBootstrap(null);
@@ -180,7 +187,7 @@ export default function Home() {
             else { setInterviewSeed(task); setStage("diagnose"); }
           }}>工作流</button>
           <button onClick={() => setStage("dashboard")}>我的空间</button>
-          <button onClick={() => setToast("创作者中心将在 Gate E 接入；当前没有伪造发布或收益状态")}>创作者中心</button>
+          <button className={stage === "creator" ? "active" : ""} onClick={() => { setCreatorFork(null); setStage("creator"); }}>创作者中心</button>
         </nav>
         <div className="top-actions">
           <button className="shortcut" onClick={() => { setStage("home"); setCommandOpen(true); window.setTimeout(() => inputRef.current?.focus(), 40); }}>
@@ -261,20 +268,25 @@ export default function Home() {
         </section>
       ) : (
         <section className="experience-wrap stage-enter">
-          <div className="context-line">
+          {stage !== "creator" && <div className="context-line">
             <button onClick={() => setStage("home")}>← 返回发现</button>
             <div className="task-context"><span>当前任务</span><strong>{stage === "compose" ? "逐节点选择最适配的 Skill 或组合" : stage === "diagnose" && !interviewSeed ? "发现最值得先交给 AI 的工作" : task}</strong></div>
             <span className="save-state"><i /> 当前仅预览，尚未保存</span>
-          </div>
+          </div>}
 
           <section className={`product-machine machine-${stage}`}>
             {stage === "catalog" && (
               <RegistryBrowser onUseInWorkflow={(skill) => {
-                setCompositionBootstrap({ kind: "registry_single", slug: skill.slug });
+                setCompositionBootstrap({ kind: "registry_single", source: skill.registrySourceId, slug: skill.slug, releaseId: skill.releaseId || undefined, expectedManifestDigest: skill.manifestDigest || undefined });
                 setToast(`正在从服务端重新核验 ${skill.name} 的真实来源和清单摘要`);
                 setStage("compose");
-              }} />
+              }} onForkSkill={(skill) => { setCreatorFork(skill); setStage("creator"); }} />
             )}
+
+            {stage === "creator" && <CreatorStudio initialFork={creatorFork} onBack={() => setStage(creatorFork ? "catalog" : "home")} onUseRelease={(release) => {
+              setCompositionBootstrap({ kind: "registry_single", source: release.source, slug: release.slug, releaseId: release.releaseId });
+              setStage("compose");
+            }} />}
 
             {stage === "runner" && <InterviewRunner workflowVersionId={runnerWorkflowVersionId} initialRunId={resumeRunId} onBack={() => setStage("dashboard")} />}
 

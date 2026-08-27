@@ -154,6 +154,10 @@ export const skillReleases = sqliteTable(
     sourceUrl: text("source_url"),
     sourceCommit: text("source_commit"),
     sourcePackageDigest: text("source_package_digest"),
+    sourceSubmissionId: text("source_submission_id"),
+    sourceSubmissionRevisionId: text("source_submission_revision_id"),
+    sourceEvaluationDigest: text("source_evaluation_digest"),
+    sourcePublishLeaseToken: text("source_publish_lease_token"),
     artifactStorageKey: text("artifact_storage_key"),
     artifactDigest: text("artifact_digest").notNull(),
     manifest: text("manifest", { mode: "json" }).$type<JsonObject>().notNull(),
@@ -188,7 +192,8 @@ export const skillReleases = sqliteTable(
   },
   (table) => [
     uniqueIndex("skill_releases_skill_version_uq").on(table.skillId, table.version),
-    uniqueIndex("skill_releases_digest_uq").on(table.artifactDigest),
+    uniqueIndex("skill_releases_skill_digest_uq").on(table.skillId, table.artifactDigest),
+    uniqueIndex("skill_releases_source_submission_uq").on(table.sourceSubmissionId),
     index("skill_releases_skill_status_idx").on(table.skillId, table.status),
     index("skill_releases_status_published_idx").on(table.status, table.publishedAt),
     index("skill_releases_source_commit_idx").on(table.sourceUrl, table.sourceCommit),
@@ -431,6 +436,220 @@ export const skillForks = sqliteTable(
     uniqueIndex("skill_forks_forked_skill_uq").on(table.forkedSkillId),
     index("skill_forks_source_release_idx").on(table.sourceReleaseId),
     index("skill_forks_workspace_status_idx").on(table.workspaceId, table.status),
+  ],
+);
+
+export const creatorSubmissions = sqliteTable(
+  "creator_submissions",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    createdByAccountId: text("created_by_account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "restrict" }),
+    publisherDisplayName: text("publisher_display_name"),
+    inputKind: text("input_kind", {
+      enum: ["skill_text", "natural_language", "registry_fork"],
+    }).notNull(),
+    status: text("status", {
+      enum: [
+        "storage_pending",
+        "draft",
+        "review_ready",
+        "publishing",
+        "published",
+        "rejected",
+        "archived",
+        "storage_failed",
+      ],
+    })
+      .notNull()
+      .default("storage_pending"),
+    revision: integer("revision").notNull().default(1),
+    currentRevisionId: text("current_revision_id").notNull(),
+    stateVersion: integer("state_version").notNull().default(0),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    briefZh: text("brief_zh").notNull().default(""),
+    description: text("description").notNull().default(""),
+    instructions: text("instructions").notNull().default(""),
+    tags: text("tags", { mode: "json" }).$type<string[]>().notNull(),
+    inputs: text("inputs", { mode: "json" }).$type<string[]>().notNull(),
+    outputs: text("outputs", { mode: "json" }).$type<string[]>().notNull(),
+    permissions: text("permissions", { mode: "json" }).$type<JsonValue>().notNull(),
+    limitations: text("limitations", { mode: "json" }).$type<string[]>().notNull(),
+    sourceUrl: text("source_url"),
+    sourceCommit: text("source_commit"),
+    sourceRegistry: text("source_registry", {
+      enum: ["openagentskill", "skillflow_creator"],
+    }),
+    sourceReleaseDigest: text("source_release_digest"),
+    sourceReleaseSnapshot: text("source_release_snapshot", { mode: "json" }).$type<JsonObject>(),
+    sourceStorageKey: text("source_storage_key").notNull(),
+    sourceMimeType: text("source_mime_type").notNull().default("text/markdown; charset=utf-8"),
+    sourceStorageStatus: text("source_storage_status", {
+      enum: ["pending", "ready", "failed"],
+    })
+      .notNull()
+      .default("pending"),
+    sourceDigest: text("source_digest").notNull(),
+    sourceByteSize: integer("source_byte_size").notNull(),
+    parserVersion: text("parser_version").notNull(),
+    requestDigest: text("request_digest").notNull(),
+    licenseSpdx: text("license_spdx"),
+    licenseEvidence: text("license_evidence", { mode: "json" }).$type<JsonObject>(),
+    riskSnapshot: text("risk_snapshot", { mode: "json" }).$type<JsonObject>(),
+    containsExecutableScripts: integer("contains_executable_scripts", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    hostedExecutionPolicy: text("hosted_execution_policy", {
+      enum: ["deny", "built_in_only", "allowlisted"],
+    })
+      .notNull()
+      .default("deny"),
+    canonicalDraft: text("canonical_draft", { mode: "json" }).$type<JsonObject>().notNull(),
+    contentDigest: text("content_digest").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    publishIdempotencyKey: text("publish_idempotency_key"),
+    publishRequestDigest: text("publish_request_digest"),
+    publishLeaseToken: text("publish_lease_token"),
+    publishLeaseExpiresAt: text("publish_lease_expires_at"),
+    targetSkillId: text("target_skill_id").references(() => skills.id, { onDelete: "restrict" }),
+    baseReleaseId: text("base_release_id").references(() => skillReleases.id, { onDelete: "restrict" }),
+    publishedSkillId: text("published_skill_id").references(() => skills.id, { onDelete: "set null" }),
+    publishedReleaseId: text("published_release_id").references(() => skillReleases.id, { onDelete: "set null" }),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    publishedAt: text("published_at"),
+    archivedAt: text("archived_at"),
+  },
+  (table) => [
+    uniqueIndex("creator_submissions_workspace_idempotency_uq").on(table.workspaceId, table.idempotencyKey),
+    uniqueIndex("creator_submissions_published_release_uq").on(table.publishedReleaseId),
+    index("creator_submissions_workspace_status_updated_idx").on(table.workspaceId, table.status, table.updatedAt),
+    index("creator_submissions_workspace_slug_idx").on(table.workspaceId, table.slug),
+    index("creator_submissions_target_status_idx").on(table.targetSkillId, table.status),
+    index("creator_submissions_source_digest_idx").on(table.sourceDigest),
+  ],
+);
+
+export const creatorSubmissionRevisions = sqliteTable(
+  "creator_submission_revisions",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    submissionId: text("submission_id")
+      .notNull()
+      .references(() => creatorSubmissions.id, { onDelete: "cascade" }),
+    revision: integer("revision").notNull(),
+    parentRevisionId: text("parent_revision_id"),
+    mutationKind: text("mutation_kind", {
+      enum: ["imported", "ai_generated", "registry_fork", "manual_edit", "ai_diff"],
+    }).notNull(),
+    sourceDigest: text("source_digest").notNull(),
+    snapshot: text("snapshot", { mode: "json" }).$type<JsonObject>().notNull(),
+    contentDigest: text("content_digest").notNull(),
+    structuredDiff: text("structured_diff", { mode: "json" }).$type<JsonValue>().notNull(),
+    createdByAccountId: text("created_by_account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "restrict" }),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("creator_submission_revisions_number_uq").on(table.submissionId, table.revision),
+    uniqueIndex("creator_submission_revisions_digest_uq").on(table.submissionId, table.contentDigest),
+    index("creator_submission_revisions_workspace_created_idx").on(table.workspaceId, table.createdAt),
+  ],
+);
+
+export const creatorEvaluations = sqliteTable(
+  "creator_evaluations",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    submissionId: text("submission_id")
+      .notNull()
+      .references(() => creatorSubmissions.id, { onDelete: "cascade" }),
+    submissionRevisionId: text("submission_revision_id")
+      .notNull()
+      .references(() => creatorSubmissionRevisions.id, { onDelete: "restrict" }),
+    contentDigest: text("content_digest").notNull(),
+    level: text("level", { enum: ["e1", "e2"] }).notNull(),
+    evaluationKey: text("evaluation_key").notNull(),
+    requestDigest: text("request_digest").notNull(),
+    resultDigest: text("result_digest"),
+    status: text("status", {
+      enum: ["running", "passed", "failed", "blocked", "cancelled"],
+    })
+      .notNull()
+      .default("running"),
+    policyVersion: text("policy_version").notNull(),
+    inputSnapshot: text("input_snapshot", { mode: "json" }).$type<JsonObject>().notNull(),
+    result: text("result", { mode: "json" }).$type<JsonObject>(),
+    modelReceipt: text("model_receipt", { mode: "json" }).$type<JsonObject>(),
+    createdByAccountId: text("created_by_account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "restrict" }),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    completedAt: text("completed_at"),
+  },
+  (table) => [
+    uniqueIndex("creator_evaluations_submission_level_key_uq").on(
+      table.submissionId,
+      table.level,
+      table.evaluationKey,
+    ),
+    index("creator_evaluations_workspace_created_idx").on(table.workspaceId, table.createdAt),
+    index("creator_evaluations_submission_revision_idx").on(
+      table.submissionId,
+      table.submissionRevisionId,
+    ),
+  ],
+);
+
+export const creatorClaims = sqliteTable(
+  "creator_claims",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    requestedByAccountId: text("requested_by_account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "restrict" }),
+    skillId: text("skill_id").references(() => skills.id, { onDelete: "set null" }),
+    submissionId: text("submission_id").references(() => creatorSubmissions.id, { onDelete: "set null" }),
+    sourceUrl: text("source_url").notNull(),
+    claimType: text("claim_type", {
+      enum: ["upstream_author", "repository_owner", "license_holder"],
+    }).notNull(),
+    evidenceType: text("evidence_type", {
+      enum: ["repository", "domain", "maintainer_note"],
+    }).notNull(),
+    subjectName: text("subject_name").notNull().default(""),
+    evidence: text("evidence", { mode: "json" }).$type<JsonObject>().notNull(),
+    evidenceDigest: text("evidence_digest").notNull(),
+    status: text("status", {
+      enum: ["pending", "verified", "rejected", "withdrawn"],
+    })
+      .notNull()
+      .default("pending"),
+    reviewedByAccountId: text("reviewed_by_account_id").references(() => accounts.id, { onDelete: "set null" }),
+    reviewReason: text("review_reason"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    reviewedAt: text("reviewed_at"),
+  },
+  (table) => [
+    uniqueIndex("creator_claims_workspace_source_uq").on(table.workspaceId, table.sourceUrl),
+    index("creator_claims_workspace_status_idx").on(table.workspaceId, table.status),
+    index("creator_claims_source_status_idx").on(table.sourceUrl, table.status),
   ],
 );
 
@@ -852,6 +1071,10 @@ export type WorkflowNode = typeof workflowNodes.$inferSelect;
 export type WorkflowEdge = typeof workflowEdges.$inferSelect;
 export type PersonalConfiguration = typeof personalConfigurations.$inferSelect;
 export type SkillFork = typeof skillForks.$inferSelect;
+export type CreatorSubmission = typeof creatorSubmissions.$inferSelect;
+export type CreatorSubmissionRevision = typeof creatorSubmissionRevisions.$inferSelect;
+export type CreatorEvaluation = typeof creatorEvaluations.$inferSelect;
+export type CreatorClaim = typeof creatorClaims.$inferSelect;
 export type Connection = typeof connections.$inferSelect;
 export type CapabilityGrant = typeof capabilityGrants.$inferSelect;
 export type Run = typeof runs.$inferSelect;

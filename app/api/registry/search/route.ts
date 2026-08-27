@@ -5,6 +5,7 @@ import {
   RegistryUpstreamError,
 } from "@/lib/upstream-registry";
 import { expandRegistrySearchQuery } from "@/lib/registry-localization";
+import { creatorRegistrySkill } from "@/lib/creator-registry";
 
 export const dynamic = "force-dynamic";
 
@@ -20,23 +21,38 @@ export async function GET(request: Request) {
     if (value) params.set(key, value.slice(0, 80));
   }
 
-  try {
-    const payload = await fetchRegistryJson<{ total?: number; skills?: unknown[] }>(
-      `/api/skills/search?${params.toString()}`,
-    );
+  const [creatorResult, upstreamResult] = await Promise.allSettled([
+    import("@/lib/gate-e-store").then(({ searchCreatorReleases }) => searchCreatorReleases(task, Math.min(limit, 8))),
+    fetchRegistryJson<{ total?: number; skills?: unknown[] }>(`/api/skills/search?${params.toString()}`),
+  ]);
+  const creatorSkills = creatorResult.status === "fulfilled" ? creatorResult.value.map(creatorRegistrySkill) : [];
+  const upstreamSkills = upstreamResult.status === "fulfilled" ? (upstreamResult.value.skills || []).map((skill) => ({
+    ...normalizeRegistrySkill(skill),
+    registrySourceId: "openagentskill" as const,
+    identityKey: `openagentskill:${normalizeRegistrySkill(skill).slug}`,
+    releaseId: null,
+    manifestDigest: null,
+    fork: { available: false, exactContent: false, source: "openagentskill" as const },
+  })) : [];
+  if (creatorSkills.length || upstreamSkills.length) {
+    const skills = [...creatorSkills, ...upstreamSkills].slice(0, limit);
     return Response.json({
       query: task,
       searchInterpretation: {
         strategy: searchInterpretation.strategy,
         englishTerms: searchInterpretation.englishTerms,
       },
-      total: payload.total ?? payload.skills?.length ?? 0,
-      skills: (payload.skills || []).map(normalizeRegistrySkill),
-      source: registrySource,
+      total: skills.length,
+      skills,
+      source: { ...registrySource, includes: ["skillflow_creator", "openagentskill"] },
+      sourceStatus: {
+        creator: creatorResult.status === "fulfilled" ? "ready" : "unavailable",
+        openagentskill: upstreamResult.status === "fulfilled" ? "ready" : "unavailable",
+      },
     });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "真实 Skill 索引暂时不可用";
-    const status = error instanceof RegistryUpstreamError ? error.status : 502;
-    return Response.json({ error: { code: "REGISTRY_UNAVAILABLE", message }, source: registrySource }, { status });
   }
+  const upstreamError = upstreamResult.status === "rejected" ? upstreamResult.reason : null;
+  const message = upstreamError instanceof Error ? upstreamError.message : "真实 Skill 索引暂时不可用";
+  const status = upstreamError instanceof RegistryUpstreamError ? upstreamError.status : 502;
+  return Response.json({ error: { code: "REGISTRY_UNAVAILABLE", message }, source: registrySource }, { status });
 }

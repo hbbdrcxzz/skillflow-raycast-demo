@@ -19,7 +19,7 @@ import type {
 
 export type CompositionStudioBootstrap =
   | { kind: "gate_b_diagnosis"; snapshot: InterviewSnapshot; workflow: AbstractWorkflow }
-  | { kind: "registry_single"; slug: string; taskContext?: string };
+  | { kind: "registry_single"; source: "openagentskill" | "skillflow_creator"; slug: string; releaseId?: string; expectedManifestDigest?: string; taskContext?: string };
 
 type CompositionStudioProps = {
   bootstrap: CompositionStudioBootstrap;
@@ -70,7 +70,7 @@ function uid(prefix: string) {
 }
 
 function sourceSelector(release: ReleasePin) {
-  return { source: release.source, slug: release.slug, expectedManifestDigest: release.manifestDigest } as const;
+  return { source: release.source, slug: release.slug, releaseId: release.releaseId, expectedManifestDigest: release.manifestDigest } as const;
 }
 
 function apiMessage(payload: ApiErrorPayload, fallback: string) {
@@ -285,7 +285,7 @@ export default function CompositionStudio({ bootstrap, onBack, onRun }: Composit
     async function start() {
       const source = bootstrap.kind === "gate_b_diagnosis"
         ? { kind: "gate_b_diagnosis" as const, snapshot: bootstrap.snapshot, workflow: bootstrap.workflow }
-        : { kind: "registry_single" as const, slug: bootstrap.slug, taskContext: bootstrap.taskContext };
+        : { kind: "registry_single" as const, source: bootstrap.source, slug: bootstrap.slug, releaseId: bootstrap.releaseId, expectedManifestDigest: bootstrap.expectedManifestDigest, taskContext: bootstrap.taskContext };
       const payload = await post<{ revision?: CompositionRevision }>("bootstrap", { source }, "bootstrap");
       if (!active || !payload?.revision) return;
       setRevision(payload.revision);
@@ -828,7 +828,7 @@ function CandidateEvidence({ candidate, onBind, replacing }: { candidate: Candid
         <div><dt>固定方式</dt><dd>{release.pinKind === "manifest_snapshot" ? "清单快照" : "不可变发布"}</dd></div>
         <div><dt>Release / Snapshot</dt><dd>{release.version || compactDigest(release.manifestDigest)}</dd></div>
         <div><dt>作者</dt><dd>{release.author.name}{release.author.verified === true ? " · 已验证" : release.author.verified === false ? " · 未验证" : " · 验证未知"}</dd></div>
-        <div><dt>来源</dt><dd>{release.source === "openagentskill" ? "OpenAgentSkill 目录" : "SkillFlow 原生目录"}{release.sourceUrl ? " · 有源地址" : " · 源地址未知"}</dd></div>
+        <div><dt>来源</dt><dd>{release.source === "openagentskill" ? "OpenAgentSkill 目录" : release.source === "skillflow_creator" ? "Skillflow 创作者 Release" : "SkillFlow 原生目录"}{release.sourceUrl ? " · 有源地址" : " · 源地址未知"}</dd></div>
         <div><dt>许可</dt><dd>{release.license.name || release.license.id || "未知，需自行核对"}</dd></div>
         <div><dt>执行边界</dt><dd>{release.hostedExecution === "built_in" ? "内置能力" : release.hostedExecution === "allowlisted" ? "白名单能力" : "仅提供安装交接信息"}</dd></div>
         <div><dt>证据等级</dt><dd>{release.evidenceLevel}</dd></div>

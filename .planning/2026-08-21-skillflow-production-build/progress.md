@@ -201,3 +201,33 @@
 - Final independent Red Team delta verdict is PASS with P0=0 and P1=0 after the UI Token total was aligned with the backend's no-double-count rule. The multi-model extension may enter the user checkpoint; production connectivity remains unverified until real server-side Secrets are configured and live calls pass.
 - On 2026-08-27 the user authorized completing the remaining Gate D publication work: commit the reviewed implementation, push `main`, and deploy a new owner-only private Sites version. This authorization does not waive the real-provider canary requirement.
 - Publication completed on 2026-08-27: source commit `bb851191c76db878d1bcfed3c127d020819b183c` was pushed to both GitHub `main` and the Sites source repository, packaged from a fresh successful production build, saved as Sites version 9 and deployed successfully to the existing private URL. Access remained custom owner-only with zero external visitors and zero groups. The production environment contains no model variables or Secrets, so the honest `MODEL_NOT_CONFIGURED` path remains active until provider credentials are supplied through server-side Secret management.
+
+## 2026-08-27 Gate E Creator Foundation Start
+
+- User asked to continue after the Gate D completion audit. Started Gate E rather than expanding the runtime or adding finance scope.
+- Froze a creator acceptance contract before schema/API edits: authenticated workspace ownership, bounded Skill text/manual and model-assisted drafting, revision CAS, deterministic E1, honest optional E2, immutable publication, pending upstream claims, Registry discovery and continued prohibition on arbitrary scripts.
+- Dispatched independent read-only product, backend/security and creator-UX audits. The Site-owning agent remains the only agent allowed to edit, build or deploy.
+
+## 2026-08-27 Gate E Implementation Candidate
+
+- Implemented authenticated creator submissions for pasted `SKILL.md`, natural-language generation and exact Registry Release forks. Original bytes are stored through a D1 pending → verified R2 → ready protocol; drafts use append-only Revision snapshots and optimistic CAS.
+- Added explicit public publisher names as unverified declarations, preserved upstream author/source/license fields, exposed a pending claim workflow and kept internal commercial-use classification out of the public free-beta UI.
+- Added conversational AI changes as before/after proposals that require explicit acceptance, deterministic E1 checks, honest optional no-tool E2 samples, immutable Release manifests, exact Registry download/detail and Gate C creator-Release binding.
+- Added same-Skill next-version drafts and preserved old Release resolution after the default Release advances. Identical-content version bumps are rejected with `NO_MATERIAL_CHANGE` rather than manufacturing a new version label.
+- Hardened publish concurrency with a pre-R2 D1 lease claim, R2 lease metadata, a Release insert fencing trigger and exact-lease cleanup. Hardened Revision concurrency with a parent/head fencing trigger inside the atomic D1 batch.
+- Verification candidate: lint PASS, production build PASS, 88/88 tests PASS, local D1/R2 HTTP smoke PASS for creation, cross-workspace isolation, stale edit rejection, E1, honest blocked E2, concurrent publish, Registry, download, Gate C pin, fork, 1.1.0 publication and post-upgrade 1.0.0 resolution. Real-browser Creator checks passed at desktop and 390 px; final independent Red Team reruns remain pending before commit/deployment.
+
+## 2026-08-27 Gate E First Red Team Remediation
+
+- The independent review correctly failed the first candidate: its generated migrations rebuilt `skill_releases`, stale same-Skill branches could replace the default head, old Release views reused mutable Skill metadata, exact Fork reconstructed lossy Markdown, publish commits did not enforce lease expiry in D1 and a failed first R2 write could not resume through the original idempotency key.
+- Replaced the migration chain with one additive transaction-safe migration that preserves legacy Release foreign-key references. Added database triggers for live publish leases, current default-head ownership, immutable Release material, valid lifecycle transitions, append-only revisions/evaluations and default-release integrity.
+- Added API SemVer ordering and base-head validation, immutable-manifest Registry/pin projections, digest-verified exact R2 Forks, lease-specific public artifact keys and recoverable idempotent source writes. Publisher attestations remain separate from the immutable generated-source snapshot.
+- Extended migration and real HTTP tests to prove legacy `personal_configurations` survive upgrade, expired leases and stale heads fail, a version lower than its base fails, exact Fork digest matches its Release, and a renamed 1.1.0 cannot mutate the 1.0.0 detail or Gate C pin.
+- Serial verification now passes production build and 95/95 automated tests; the extended live local HTTP/D1/R2 smoke also passes. No commit, push or deployment has occurred. A final independent delta review is now the only Gate E code-acceptance blocker.
+
+## 2026-08-27 Gate E Local Acceptance PASS
+
+- Repeated Red Team deltas closed the complete D1/R2 recovery protocol, including ambiguous D1 commits, timed-out attempt takeover, exact stateVersion/request/source fences, audit fencing and the final shared-key deletion race. Retryable private creator-source keys are never deleted by an attempt; public Release artifact cleanup remains safe because its key contains a unique publish lease token.
+- AI proposal acceptance is now recorded honestly as creator-confirmed `manual_edit`; clients cannot forge an `ai_diff` provenance label. Exact historical Registry and Gate C pin surfaces no longer fall back to mutable latest-Skill metadata.
+- Final serial verification passes production build, lint, diff-check and 96/96 automated tests. The extended local HTTP/D1/R2 smoke passes creation, isolation, Revision CAS, E1, honest E2 blocking, concurrent publication, exact download/Fork, Gate C binding, lower-version rejection, stale-head rejection, 1.0.0→1.1.0 publication and immutable 1.0.0 presentation after the newer default.
+- Final independent Red Team verdict: PASS, P0=0, P1=0, P2=0. Gate E is ready for the user checkpoint. No commit, push, migration application to production or Sites deployment has been performed.

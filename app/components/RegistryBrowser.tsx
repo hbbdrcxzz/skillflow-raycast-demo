@@ -2,7 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-type RegistrySkill = {
+export type RegistrySkill = {
+  registrySourceId: "openagentskill" | "skillflow_creator";
+  identityKey: string;
+  releaseId: string | null;
+  manifestDigest: string | null;
   slug: string;
   name: string;
   description: string;
@@ -32,12 +36,13 @@ type RegistrySkill = {
     blocked: boolean;
     permissionHints: { id: string; label: string; severity: string; severityLabel?: string; reason: string; originalLabel?: string; originalReason?: string }[];
   };
-  install: { ready: boolean; command: string; targetCount: number };
+  install: { ready: boolean; command: string; downloadUrl?: string; targetCount: number };
   maintenance: { status: string; label: string };
   risk: { label: string };
   attribution: { status: string; label: string; sourceUrl: string; creatorUrl: string; publicNote: string };
   repository?: { url: string };
   license?: { id: string; name: string; url: string };
+  fork?: { available: boolean; exactContent: boolean; source: "openagentskill" | "skillflow_creator"; releaseId?: string; expectedDigest?: string };
   raw?: Record<string, unknown>;
 };
 
@@ -94,7 +99,7 @@ function compactNumber(value: number) {
   return String(value || 0);
 }
 
-export default function RegistryBrowser({ onUseInWorkflow }: { onUseInWorkflow: (skill: RegistrySkill) => void }) {
+export default function RegistryBrowser({ onUseInWorkflow, onForkSkill }: { onUseInWorkflow: (skill: RegistrySkill) => void; onForkSkill: (skill: RegistrySkill) => void }) {
   const [query, setQuery] = useState("用户访谈 PRD 产品研究");
   const [skills, setSkills] = useState<RegistrySkill[]>([]);
   const [total, setTotal] = useState(0);
@@ -148,7 +153,9 @@ export default function RegistryBrowser({ onUseInWorkflow }: { onUseInWorkflow: 
     setSelected(skill);
     setDetailLoading(true);
     try {
-      const response = await fetch(`/api/registry/skills/${encodeURIComponent(skill.slug)}`);
+      const detailQuery = new URLSearchParams({ source: skill.registrySourceId });
+      if (skill.releaseId) detailQuery.set("releaseId", skill.releaseId);
+      const response = await fetch(`/api/registry/skills/${encodeURIComponent(skill.slug)}?${detailQuery.toString()}`);
       const payload = (await response.json()) as { skill?: RegistrySkill };
       if (response.ok && payload.skill) setSelected(payload.skill);
     } finally {
@@ -156,11 +163,11 @@ export default function RegistryBrowser({ onUseInWorkflow }: { onUseInWorkflow: 
     }
   }
 
-  function toggleCompare(slug: string) {
+  function toggleCompare(identityKey: string) {
     setCompare((current) => {
-      if (current.includes(slug)) return current.filter((item) => item !== slug);
-      if (current.length >= 3) return [...current.slice(1), slug];
-      return [...current, slug];
+      if (current.includes(identityKey)) return current.filter((item) => item !== identityKey);
+      if (current.length >= 3) return [...current.slice(1), identityKey];
+      return [...current, identityKey];
     });
   }
 
@@ -172,7 +179,7 @@ export default function RegistryBrowser({ onUseInWorkflow }: { onUseInWorkflow: 
   }
 
   const compareSkills = useMemo(
-    () => compare.map((slug) => skills.find((skill) => skill.slug === slug)).filter(Boolean) as RegistrySkill[],
+    () => compare.map((identityKey) => skills.find((skill) => skill.identityKey === identityKey)).filter(Boolean) as RegistrySkill[],
     [compare, skills],
   );
   const selectedGuide = selected ? {
@@ -211,8 +218,8 @@ export default function RegistryBrowser({ onUseInWorkflow }: { onUseInWorkflow: 
           <div className="compare-title"><span>并排比较 · {compareSkills.length}/3</span><button type="button" onClick={() => setCompare([])}>清空</button></div>
           <div className="compare-grid">
             {compareSkills.map((skill) => (
-              <article key={skill.slug}>
-                <button type="button" className="compare-remove" aria-label={`移除 ${skill.name}`} onClick={() => toggleCompare(skill.slug)}>×</button>
+              <article key={skill.identityKey}>
+                <button type="button" className="compare-remove" aria-label={`移除 ${skill.name}`} onClick={() => toggleCompare(skill.identityKey)}>×</button>
                 <small>{skill.categoryZh || "待分类"}</small><h3 lang="en">{skill.name}</h3>
                 <p className="compare-brief">{skill.briefZh || "中文功能说明待补充。"}</p>
                 <div className="compare-score"><span>上游质量信号<strong>{skill.quality.score}</strong></span><span>信任<strong>{skill.trust.score}</strong></span><span>安全<strong>{skill.safety.score}</strong></span></div>
@@ -228,7 +235,7 @@ export default function RegistryBrowser({ onUseInWorkflow }: { onUseInWorkflow: 
         <section className="registry-list" aria-busy={loading}>
           {loading && Array.from({ length: 6 }, (_, index) => <div className="skill-card skeleton" key={index} />)}
           {!loading && skills.map((skill, index) => (
-            <article className={`skill-card ${selected?.slug === skill.slug ? "selected" : ""}`} key={skill.slug}>
+            <article className={`skill-card ${selected?.identityKey === skill.identityKey ? "selected" : ""}`} key={skill.identityKey}>
               <button type="button" className="skill-card-main" onClick={() => void openDetail(skill)}>
                 <span className="skill-rank">{String(index + 1).padStart(2, "0")}</span>
                 <span className="skill-card-copy">
@@ -242,7 +249,7 @@ export default function RegistryBrowser({ onUseInWorkflow }: { onUseInWorkflow: 
               <div className="skill-card-meta">
                 <span>★ {compactNumber(skill.stats.stars)}</span><span>{skill.maintenance.label}</span><span>{skill.safety.label}</span>
                 {skill.safety.blocked && <span className="blocked-badge">已阻断 · 不提供安装交接</span>}
-                <button type="button" className={compare.includes(skill.slug) ? "active" : ""} onClick={() => toggleCompare(skill.slug)}>{compare.includes(skill.slug) ? "已加入比较" : "加入比较"}</button>
+                <button type="button" className={compare.includes(skill.identityKey) ? "active" : ""} onClick={() => toggleCompare(skill.identityKey)}>{compare.includes(skill.identityKey) ? "已加入比较" : "加入比较"}</button>
               </div>
             </article>
           ))}
@@ -302,7 +309,7 @@ export default function RegistryBrowser({ onUseInWorkflow }: { onUseInWorkflow: 
                   </>
                 )}
               </section>
-              <div className="detail-actions"><button type="button" disabled={!selected.install.command || selected.safety.blocked} onClick={() => void copyCommand(selected)}>{copied === selected.slug ? "已复制" : "复制安装命令"}</button><button type="button" className="primary" disabled={selected.safety.blocked} onClick={() => onUseInWorkflow(selected)}>{selected.safety.blocked ? "已阻断 · 不可适配" : "适配到我的工作 ↗"}</button></div>
+              <div className="detail-actions">{selected.install.downloadUrl ? <a className="registry-download" href={selected.install.downloadUrl}>下载不可变 Release</a> : <button type="button" disabled={!selected.install.command || selected.safety.blocked} onClick={() => void copyCommand(selected)}>{copied === selected.slug ? "已复制" : "复制安装命令"}</button>}<button type="button" disabled={!selected.fork?.available || !selected.fork.exactContent} onClick={() => onForkSkill(selected)}>{selected.fork?.available && selected.fork.exactContent ? "按我的需求修改" : "需提供完整源文件后修改"}</button><button type="button" className="primary" disabled={selected.safety.blocked} onClick={() => onUseInWorkflow(selected)}>{selected.safety.blocked ? "已阻断 · 不可适配" : "适配到我的工作 ↗"}</button></div>
               <div className="source-note">
                 <p>{selected.attribution.publicNote || "公开来源已保留原作者、仓库与许可证归属；进入索引不代表已获托管执行授权。"}</p>
                 <p>许可证：{selectedLicenseUrl ? <a href={selectedLicenseUrl} target="_blank" rel="noreferrer">{selected.license?.id || selected.license?.name || "查看许可证说明"}</a> : <span>{selected.license?.id || selected.license?.name ? `${selected.license?.id || selected.license?.name} · 许可证链接待核验` : "上游未提供许可证链接，待核验"}</span>}</p>

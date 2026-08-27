@@ -18,7 +18,7 @@ test("Gate C stays session-only until Gate D performs a server-side save and ada
 test("Gate C UI supports both confirmed diagnosis and Registry single-Skill bootstrap", async () => {
   const source = await readFile(componentPath, "utf8");
   assert.match(source, /kind: "gate_b_diagnosis"; snapshot: InterviewSnapshot; workflow: AbstractWorkflow/);
-  assert.match(source, /kind: "registry_single"; slug: string; taskContext\?: string/);
+  assert.match(source, /kind: "registry_single"; source: "openagentskill" \| "skillflow_creator"; slug: string; releaseId\?: string; expectedManifestDigest\?: string; taskContext\?: string/);
   assert.match(source, /`\/api\/workflows\/composition\/\$\{path\}`/);
   assert.match(source, /post<\{ revision\?: CompositionRevision \}>\("bootstrap"/);
 });

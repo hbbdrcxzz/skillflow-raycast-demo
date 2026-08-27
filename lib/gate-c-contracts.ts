@@ -12,7 +12,7 @@ export type CompositionExecutionMode =
   | "connector_action";
 
 export type BindingRole = "prepare" | "primary" | "review" | "fallback";
-export type ReleaseSource = "skillflow_runtime" | "openagentskill";
+export type ReleaseSource = "skillflow_runtime" | "openagentskill" | "skillflow_creator";
 
 export type PermissionRequirement = {
   capability: string;
@@ -197,6 +197,7 @@ export type CompositionRevision = {
 export type ReleaseSelector = {
   source: ReleaseSource;
   slug: string;
+  releaseId?: string;
   expectedManifestDigest?: string;
 };
 

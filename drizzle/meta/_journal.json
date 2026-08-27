@@ -36,6 +36,13 @@
       "when": 1787714801336,
       "tag": "0004_complex_blacklash",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1787835865252,
+      "tag": "0005_skinny_calypso",
+      "breakpoints": true
     }
   ]
 }

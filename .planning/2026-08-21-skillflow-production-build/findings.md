@@ -136,3 +136,25 @@
 - Fallback makes cost accounting intrinsically partial when a failed provider does not return usage. Skillflow therefore records the successful provider's reported Token use as confirmed usage and explicitly labels the aggregate partial; the operator must use provider invoices for the unknown portion.
 - Provider-constrained JSON is only the first validation layer. If literal quote grounding, Skill allowlists or business semantics reject an otherwise successful provider response, the run still needs the provider/model/request/usage receipt because the call processed data and may be billed even though no product result is accepted.
 - Cloudflare Worker bindings must reach deep server modules. Current Workers can populate `process.env` under Node compatibility, but the Worker entry also copies only the explicit model allowlist so Sites compatibility-date differences cannot silently turn a configured deployment into `MODEL_NOT_CONFIGURED`.
+
+# 2026-08-27 Gate E Creator Findings
+
+- A creator Dashboard is the wrong primary abstraction. The valuable loop is import/describe/fork → source and capability contract → conversational structured Diff → E1/E2 evidence → immutable Release → Registry verification → workflow binding.
+- Uploading or indexing a public Skill does not prove authorship. Gate E must preserve original author/source separately from uploader, derivative creator and pending verified-maintainer claim.
+
+## Gate E Red Team Findings and Resolution
+
+- D1 migrations that rebuild a referenced table with `PRAGMA foreign_keys=OFF` are unsafe inside the production migration transaction: the pragma cannot take effect mid-transaction and downstream Release references make the drop fail. Gate E therefore uses only additive table/column/index/trigger statements and tests a real legacy reference during one transaction.
+- An API precheck alone cannot serialize two version branches. The authoritative invariant is: the new Release's submission must name the exact old default Release, hold an unexpired publish lease and update the Skill head inside the same D1 batch. Both a user-facing early check and a database trigger are necessary.
+- A Skill row is a mutable latest-version projection, not historical Release evidence. Exact detail, download, Fork and Gate C pin surfaces must derive names, Chinese Briefs, authors and semantics from the selected Release Manifest.
+- “Exact Fork” means byte-for-byte reuse of the immutable public artifact after a fatal UTF-8 decode and SHA-256 read-back check. Reconstructing a `SKILL.md` from selected fields is a derivative conversion and cannot carry the exact-content label.
+- R2 failure recovery must reuse the same submission, request digest, object key and expected source digest. A retry first claims `storage_failed → storage_pending`, reconstructs only a source proven identical to the first request, verifies the write, then commits ready state plus audit atomically.
+- Creator publication cannot stop at Registry display: Gate C must resolve the exact `(source, slug, digest)` creator Release authoritatively, or the new supply cannot enter the user's workflow.
+- Bare slugs are not globally safe across OpenAgentSkill and local creator supply. Registry detail, comparison and workflow selectors require an explicit source namespace.
+- The existing globally unique `skill_releases.artifact_digest` lets one Skill reserve a shared digest and blocks legitimate template reuse. Uniqueness belongs to `(skill_id, artifact_digest)`; cross-Skill duplication is a review signal.
+- Application convention alone does not make a Release immutable. Published material needs database triggers blocking update/delete while still allowing explicit yanked/revoked status transitions.
+- E1 is deterministic contract/safety review. E2 for ordinary instruction-only Skills is an isolated model sample with no tools and must not be labelled as execution of imported scripts; built-in Adapter execution remains a separate Gate D capability.
+- A new version is not a new label over identical bytes. Because `(skill_id, artifact_digest)` is unique, the product should refuse unchanged 1.0.0 → 1.1.0 publication and ask for a real Revision; the API now reports that reason explicitly.
+- “Latest Release” and “exact Release” are different reads. Discovery may join `skills.default_release_id`, but a saved workflow, download URL or fork must resolve the requested immutable Release ID even after a newer default exists.
+- D1 transaction atomicity does not remove the need for fencing. The durable order is lease claim before R2 write, Release insertion guarded by the exact lease token, then root finalization in the same batch; cleanup may delete only the artifact owned by the same failed lease.
+- Public publisher identity needs three distinct states: a visible publisher-declared name, preserved upstream author/source facts and a separately reviewed claim. Collapsing these into one “作者” field would turn user assertion into false verification.
