@@ -8,6 +8,14 @@ interface Env {
   FILES: R2Bucket;
   OPENAI_API_KEY?: string;
   OPENAI_MODEL?: string;
+  DEEPSEEK_API_KEY?: string;
+  DEEPSEEK_MODEL?: string;
+  ANTHROPIC_API_KEY?: string;
+  ANTHROPIC_MODEL?: string;
+  SKILLFLOW_MODEL_ROUTE_DEFAULT?: string;
+  SKILLFLOW_MODEL_ROUTE_DIAGNOSIS?: string;
+  SKILLFLOW_MODEL_ROUTE_COMPOSITION?: string;
+  SKILLFLOW_MODEL_ROUTE_RUNTIME?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -22,6 +30,29 @@ interface ExecutionContext {
   passThroughOnException(): void;
 }
 
+const MODEL_ENV_KEYS = [
+  "OPENAI_API_KEY",
+  "OPENAI_MODEL",
+  "DEEPSEEK_API_KEY",
+  "DEEPSEEK_MODEL",
+  "ANTHROPIC_API_KEY",
+  "ANTHROPIC_MODEL",
+  "SKILLFLOW_MODEL_ROUTE_DEFAULT",
+  "SKILLFLOW_MODEL_ROUTE_DIAGNOSIS",
+  "SKILLFLOW_MODEL_ROUTE_COMPOSITION",
+  "SKILLFLOW_MODEL_ROUTE_RUNTIME",
+] as const satisfies readonly (keyof Env)[];
+
+function exposeModelBindingsToServerRuntime(env: Env) {
+  // Cloudflare exposes text/secrets through process.env on current compatibility
+  // dates. Copying only this allowlist also keeps the contract reliable on older
+  // Sites runtimes without replacing the global environment object.
+  for (const key of MODEL_ENV_KEYS) {
+    const value = env[key];
+    if (typeof value === "string") process.env[key] = value;
+  }
+}
+
 // Image security config. SVG sources with .svg extension auto-skip the
 // optimization endpoint on the client side (served directly, no proxy).
 // To route SVGs through the optimizer (with security headers), set
@@ -30,6 +61,7 @@ interface ExecutionContext {
 
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    exposeModelBindingsToServerRuntime(env);
     const url = new URL(request.url);
 
     if (url.pathname === "/_vinext/image") {

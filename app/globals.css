@@ -114,6 +114,29 @@
 .runner-timeline article strong { display: block; font-size: 13px; }
 .runner-timeline article small { display: block; margin-top: 4px; color: var(--text-tertiary); font-size: 12px; }
 
+.model-receipt-details {
+  margin-top: 7px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.model-receipt-details summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.model-receipt-details p {
+  display: grid;
+  gap: 2px;
+  margin: 7px 0 0;
+}
+
+.model-receipt-details p span { color: var(--text-faint); }
+.model-receipt-details p strong { color: var(--text-secondary); font-size: 11px; font-weight: 500; }
+.model-receipt-details code { overflow-wrap: anywhere; color: var(--text-faint); font: 10px/1.4 var(--font-mono); }
+.model-receipt-details em { display: block; margin-top: 8px; color: #c9a56d; font-size: 11px; font-style: normal; line-height: 1.5; }
+
 .run-state {
   width: fit-content;
   padding: 5px 8px;

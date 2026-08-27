@@ -634,6 +634,7 @@ export async function runInterviewTurn(value: unknown): Promise<InterviewTurnRes
   }
   const existingFacts = input.snapshot?.facts ?? [];
   const response = await createStructuredResponse<TurnModelOutput>({
+    taskClass: "diagnosis",
     schemaName: "skillflow_work_discovery_turn",
     schema: turnOutputSchema,
     instructions: modelInstructions(),

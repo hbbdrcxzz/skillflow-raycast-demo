@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     const workspace = await requireGateDWorkspace();
-    if (!modelConfigured()) throw new GateDContractError("MODEL_NOT_CONFIGURED", "真实运行层尚未配置服务端模型", 503);
+    if (!modelConfigured("runtime")) throw new GateDContractError("MODEL_NOT_CONFIGURED", "真实运行层尚未配置可用的服务端模型路由", 503);
     const body = await readBoundedJson(request, 120_000) as Record<string, unknown>;
     let validated: ReturnType<typeof validateAnalysisInput>;
     try {

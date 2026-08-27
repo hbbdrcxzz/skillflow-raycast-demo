@@ -169,6 +169,7 @@ export async function proposeNaturalRevision(
   instruction: string,
 ): Promise<{ proposal: NaturalLanguageProposal; receipt: ModelRunReceipt }> {
   const response = await createStructuredResponse<ProposalModelOutput>({
+    taskClass: "composition",
     schemaName: "skillflow_composition_revision_proposal",
     schema: proposalSchema,
     instructions: `你只把用户对当前工作流组合的修改要求转换为结构化预览，不得应用修改。

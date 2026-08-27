@@ -119,6 +119,14 @@ test("Gate D runner exposes real persistence, approval, retry, cancel, reopen an
   assert.match(markdown, /javascript\|vbscript\|data/);
 });
 
+test("Gate D UI totals confirmed failure usage without double-counting semantic failures", async () => {
+  const runnerSource = await source("app/components/InterviewRunner.tsx");
+  assert.match(runnerSource, /function knownStepTokens\(step: Step\)/);
+  assert.match(runnerSource, /if \(typeof modelRunTokens === "number"\) return modelRunTokens/);
+  assert.match(runnerSource, /attempt\.usageStatus === "reported"/);
+  assert.match(runnerSource, /sum \+ knownStepTokens\(step\)/);
+});
+
 test("Gate D persistence revalidates portable revisions without Worker session affinity", async () => {
   const [gateC, gateD] = await Promise.all([source("lib/gate-c-composition.ts"), source("lib/gate-d-contracts.ts")]);
   assert.match(gateC, /validatePortableCompositionRevision/);

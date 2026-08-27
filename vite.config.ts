@@ -13,7 +13,9 @@ const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 
 const localBindingConfig = {
   main: "./worker/index.ts",
-  compatibility_flags: ["nodejs_compat"],
+  // Keep runtime secrets available to server modules that use process.env even
+  // when the hosting compatibility date predates the automatic 2025-04-01 flag.
+  compatibility_flags: ["nodejs_compat", "nodejs_compat_populate_process_env"],
   d1_databases: d1
     ? [
         {

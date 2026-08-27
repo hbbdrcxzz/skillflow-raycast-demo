@@ -5,11 +5,17 @@ const failedOnce = new Set();
 
 function outputFor(schemaName, input) {
   if (schemaName === "interview_evidence_v1") {
+    if (String(input.research_goal || "").includes("DEEP_SHAPE_CANARY")) {
+      return { evidence_items: [null], review_queue: [], coverage_note: "故意触发深层合同异常" };
+    }
     const segment = input.normalized_segments.find((item) => item.text.includes("证据")) || input.normalized_segments[0];
+    const quote = String(input.research_goal || "").includes("SEMANTIC_CANARY")
+      ? "这段原话并不存在于用户材料中"
+      : segment.text;
     return {
       evidence_items: [{
         evidence_id: "ev-001", segment_id: segment.segment_id, source_id: segment.source_id,
-        category: "pain_point", quote: segment.text, interpretation: "用户要求 AI 产出必须保留可回查的原始证据。",
+        category: "pain_point", quote, interpretation: "用户要求 AI 产出必须保留可回查的原始证据。",
         confidence: 0.96, needs_review: false, review_reason: null,
       }],
       review_queue: [], coverage_note: "本地 Gate D 验收桩：提取一条可逐字校验的证据。",
@@ -86,7 +92,7 @@ const server = http.createServer((request, response) => {
       if (String(input.research_goal || "").includes("FAIL_ONCE") && !failedOnce.has(failKey)) {
         failedOnce.add(failKey);
         response.writeHead(200, { "content-type": "application/json" });
-        response.end(JSON.stringify({ id: "resp_malformed_once", model: "gate-d-local-contract-model", status: "completed", output_text: "{not-json", usage: {} }));
+        response.end(JSON.stringify({ id: "resp_malformed_once", model: "gate-d-local-contract-model", status: "completed", output_text: "{not-json", usage: { input_tokens: 55, output_tokens: 13, total_tokens: 68 } }));
         return;
       }
       const output = outputFor(schemaName, input);

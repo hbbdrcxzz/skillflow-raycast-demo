@@ -1,15 +1,16 @@
-import { modelConfigured } from "@/lib/openai-responses";
+import { modelConfigurationStatus } from "@/lib/openai-responses";
 
 export const dynamic = "force-dynamic";
 
-// 前置探测：只返回布尔状态，绝不回传密钥或模型名等敏感配置。
+// 公共前置探测只返回当前功能是否可用；提供商拓扑、模型名与密钥均留在服务端。
 export async function GET() {
+  const status = modelConfigurationStatus();
   return Response.json(
     {
-      configured: modelConfigured(),
-      requirement: "OPENAI_API_KEY + OPENAI_MODEL（仅服务端）",
-      policy: "未配置时真实运行会返回 MODEL_NOT_CONFIGURED，拒绝伪造结果。",
+      configured: status.routes.runtime.configured,
+      requirement: "至少配置一组服务端模型凭据与模型；支持 OpenAI、DeepSeek、Anthropic。",
+      policy: "真实提供商、模型、Token、耗时与降级路径进入运行回执；未配置时拒绝伪造结果。",
     },
-    { headers: { "cache-control": "no-store" } },
+    { headers: { "cache-control": "no-store, private" } },
   );
 }

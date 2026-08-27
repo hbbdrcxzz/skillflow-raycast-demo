@@ -18,6 +18,7 @@ import {
 import {
   createStructuredResponse,
   ModelGatewayError,
+  type ModelCancellation,
   type ModelRunReceipt,
   type ModelUsage,
 } from "@/lib/openai-responses";
@@ -93,6 +94,8 @@ export type PrdRuntimeInput = {
   workflowNodes: WorkflowAiAssessment[];
 };
 
+export type RuntimeModelOptions = { cancellation?: ModelCancellation };
+
 export type NormalizedInterviewStepOutput = {
   transcript: string;
   characterCount: number;
@@ -107,6 +110,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function invalidOutput(message: string): never {
   throw new ModelGatewayError("MODEL_OUTPUT_INVALID", message, 502);
+}
+
+function rethrowWithModelRun(error: unknown, modelRun: ModelRunReceipt): never {
+  const contractError = error instanceof ModelGatewayError
+    ? error
+    : new ModelGatewayError("MODEL_OUTPUT_INVALID", "模型结果未通过平台业务合同校验", 502);
+  throw new ModelGatewayError(contractError.code, contractError.message, contractError.httpStatus, {
+    ...contractError.details,
+    provider: modelRun.provider,
+    requestId: modelRun.providerRequestId,
+    attempts: modelRun.attempts,
+    modelRun,
+  });
 }
 
 function requireModelInstruction(value: string | null): string {
@@ -207,13 +223,15 @@ function finishReceipt(runId: string, started: number, steps: RuntimeStepReceipt
   const completed = Date.now();
   const usage = steps.reduce<ModelUsage>(
     (sum, step) => ({
+      uncachedInputTokens: sum.uncachedInputTokens + (step.modelRun?.usage.uncachedInputTokens ?? 0),
       inputTokens: sum.inputTokens + (step.modelRun?.usage.inputTokens ?? 0),
       outputTokens: sum.outputTokens + (step.modelRun?.usage.outputTokens ?? 0),
       totalTokens: sum.totalTokens + (step.modelRun?.usage.totalTokens ?? 0),
       cachedInputTokens: sum.cachedInputTokens + (step.modelRun?.usage.cachedInputTokens ?? 0),
+      cacheCreationInputTokens: sum.cacheCreationInputTokens + (step.modelRun?.usage.cacheCreationInputTokens ?? 0),
       reasoningTokens: sum.reasoningTokens + (step.modelRun?.usage.reasoningTokens ?? 0),
     }),
-    { inputTokens: 0, outputTokens: 0, totalTokens: 0, cachedInputTokens: 0, reasoningTokens: 0 },
+    { uncachedInputTokens: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0, cachedInputTokens: 0, cacheCreationInputTokens: 0, reasoningTokens: 0 },
   );
   return {
     runId,
@@ -268,9 +286,10 @@ export function runNormalizeInterviewStep(input: {
 export async function runExtractEvidenceStep(input: {
   researchGoal: string;
   normalized: NormalizedInterviewStepOutput;
-}): Promise<{ output: EvidenceExtractionOutput; receipt: RuntimeStepReceipt }> {
+}, modelOptions: RuntimeModelOptions = {}): Promise<{ output: EvidenceExtractionOutput; receipt: RuntimeStepReceipt }> {
   const skill = interviewProductManagerSkills.extractEvidence;
   const run = await createStructuredResponse<EvidenceExtractionOutput>({
+    taskClass: "runtime",
     schemaName: "interview_evidence_v1",
     schema: skill.outputSchema,
     instructions: requireModelInstruction(skill.systemInstruction),
@@ -280,19 +299,24 @@ export async function runExtractEvidenceStep(input: {
       normalized_segments: input.normalized.segments,
     }),
     maxOutputTokens: 5_000,
-  });
-  const output = validateEvidenceShape(run.data);
-  const errors = validateExtractedEvidence(input.normalized.segments, output);
-  if (errors.length) invalidOutput(`证据校验失败：${errors.slice(0, 3).join("；")}`);
-  return { output, receipt: modelStep(skill, run.receipt) };
+  }, modelOptions);
+  try {
+    const output = validateEvidenceShape(run.data);
+    const errors = validateExtractedEvidence(input.normalized.segments, output);
+    if (errors.length) invalidOutput(`证据校验失败：${errors.slice(0, 3).join("；")}`);
+    return { output, receipt: modelStep(skill, run.receipt) };
+  } catch (error) {
+    rethrowWithModelRun(error, run.receipt);
+  }
 }
 
 export async function runClusterInsightsStep(input: {
   researchGoal: string;
   evidence: EvidenceExtractionOutput;
-}): Promise<{ output: InsightClusteringOutput; receipt: RuntimeStepReceipt }> {
+}, modelOptions: RuntimeModelOptions = {}): Promise<{ output: InsightClusteringOutput; receipt: RuntimeStepReceipt }> {
   const skill = interviewProductManagerSkills.clusterInsights;
   const run = await createStructuredResponse<InsightClusteringOutput>({
+    taskClass: "runtime",
     schemaName: "interview_insights_v1",
     schema: skill.outputSchema,
     instructions: requireModelInstruction(skill.systemInstruction),
@@ -302,20 +326,25 @@ export async function runClusterInsightsStep(input: {
       max_theme_count: 8,
     }),
     maxOutputTokens: 5_000,
-  });
-  const output = validateClusterShape(run.data);
-  const errors = validateClusteredInsights(input.evidence.evidence_items, output, 8);
-  if (errors.length) invalidOutput(`主题校验失败：${errors.slice(0, 3).join("；")}`);
-  return { output, receipt: modelStep(skill, run.receipt) };
+  }, modelOptions);
+  try {
+    const output = validateClusterShape(run.data);
+    const errors = validateClusteredInsights(input.evidence.evidence_items, output, 8);
+    if (errors.length) invalidOutput(`主题校验失败：${errors.slice(0, 3).join("；")}`);
+    return { output, receipt: modelStep(skill, run.receipt) };
+  } catch (error) {
+    rethrowWithModelRun(error, run.receipt);
+  }
 }
 
 export async function runAssessWorkflowStep(input: {
   researchGoal: string;
   evidence: EvidenceExtractionOutput;
   insights: InsightClusteringOutput;
-}): Promise<{ output: WorkflowAiAssessmentOutput; receipt: RuntimeStepReceipt }> {
+}, modelOptions: RuntimeModelOptions = {}): Promise<{ output: WorkflowAiAssessmentOutput; receipt: RuntimeStepReceipt }> {
   const skill = interviewProductManagerSkills.assessWorkflowAi;
   const run = await createStructuredResponse<WorkflowAiAssessmentOutput>({
+    taskClass: "runtime",
     schemaName: "workflow_ai_assessment_v1",
     schema: skill.outputSchema,
     instructions: requireModelInstruction(skill.systemInstruction),
@@ -326,19 +355,24 @@ export async function runAssessWorkflowStep(input: {
       allowed_skill_slugs: ALLOWED_SKILL_SLUGS,
     }),
     maxOutputTokens: 5_000,
-  });
-  const output = validateWorkflowShape(run.data);
-  const errors = validateWorkflowAiAssessment(output, input.evidence.evidence_items, [...ALLOWED_SKILL_SLUGS]);
-  if (errors.length) invalidOutput(`工作流校验失败：${errors.slice(0, 3).join("；")}`);
-  return { output, receipt: modelStep(skill, run.receipt) };
+  }, modelOptions);
+  try {
+    const output = validateWorkflowShape(run.data);
+    const errors = validateWorkflowAiAssessment(output, input.evidence.evidence_items, [...ALLOWED_SKILL_SLUGS]);
+    if (errors.length) invalidOutput(`工作流校验失败：${errors.slice(0, 3).join("；")}`);
+    return { output, receipt: modelStep(skill, run.receipt) };
+  } catch (error) {
+    rethrowWithModelRun(error, run.receipt);
+  }
 }
 
-export async function runGeneratePrdStep(input: PrdRuntimeInput): Promise<{
+export async function runGeneratePrdStep(input: PrdRuntimeInput, modelOptions: RuntimeModelOptions = {}): Promise<{
   output: PrdGenerationOutput;
   receipt: RuntimeStepReceipt;
 }> {
   const skill = interviewProductManagerSkills.generatePrd;
   const run = await createStructuredResponse<PrdGenerationOutput>({
+    taskClass: "runtime",
     schemaName: "evidence_backed_prd_v1",
     schema: skill.outputSchema,
     instructions: requireModelInstruction(skill.systemInstruction),
@@ -352,8 +386,12 @@ export async function runGeneratePrdStep(input: PrdRuntimeInput): Promise<{
       requested_detail: "review_ready",
     }),
     maxOutputTokens: 7_000,
-  });
-  return { output: validatePrdShape(run.data), receipt: modelStep(skill, run.receipt) };
+  }, modelOptions);
+  try {
+    return { output: validatePrdShape(run.data), receipt: modelStep(skill, run.receipt) };
+  } catch (error) {
+    rethrowWithModelRun(error, run.receipt);
+  }
 }
 
 export function runPrdQualityStep(input: {
@@ -391,6 +429,7 @@ export async function analyzeInterview(input: { transcript: string; researchGoal
 
   const evidenceSkill = interviewProductManagerSkills.extractEvidence;
   const evidenceRun = await createStructuredResponse<EvidenceExtractionOutput>({
+    taskClass: "runtime",
     schemaName: "interview_evidence_v1",
     schema: evidenceSkill.outputSchema,
     instructions: requireModelInstruction(evidenceSkill.systemInstruction),
@@ -408,6 +447,7 @@ export async function analyzeInterview(input: { transcript: string; researchGoal
 
   const clusterSkill = interviewProductManagerSkills.clusterInsights;
   const clusterRun = await createStructuredResponse<InsightClusteringOutput>({
+    taskClass: "runtime",
     schemaName: "interview_insights_v1",
     schema: clusterSkill.outputSchema,
     instructions: requireModelInstruction(clusterSkill.systemInstruction),
@@ -425,6 +465,7 @@ export async function analyzeInterview(input: { transcript: string; researchGoal
 
   const workflowSkill = interviewProductManagerSkills.assessWorkflowAi;
   const workflowRun = await createStructuredResponse<WorkflowAiAssessmentOutput>({
+    taskClass: "runtime",
     schemaName: "workflow_ai_assessment_v1",
     schema: workflowSkill.outputSchema,
     instructions: requireModelInstruction(workflowSkill.systemInstruction),
@@ -479,6 +520,7 @@ export async function generatePrd(input: PrdRuntimeInput) {
   ];
   const prdSkill = interviewProductManagerSkills.generatePrd;
   const result = await createStructuredResponse<PrdGenerationOutput>({
+    taskClass: "runtime",
     schemaName: "evidence_backed_prd_v1",
     schema: prdSkill.outputSchema,
     instructions: requireModelInstruction(prdSkill.systemInstruction),

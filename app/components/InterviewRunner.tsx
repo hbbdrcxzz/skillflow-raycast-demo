@@ -6,7 +6,11 @@ type Evidence = { evidence_id: string; quote: string; interpretation: string; ca
 type Theme = { theme_id: string; title: string; statement: string; supporting_evidence_ids: string[]; product_implication: string };
 type ApprovedTheme = Theme & { approved_title?: string; approved_statement?: string };
 type WorkflowNode = { node_id: string; work_step: string; ai_decision: string; decision_reason: string; human_role: string; recommended_skill_slugs: string[] };
-type Step = { id: string; stepKey: string; sequence: number; attempt: number; status: string; receipt?: { modelRun?: { model?: string; usage?: { totalTokens?: number } } } };
+type ModelProvider = "openai" | "deepseek" | "anthropic";
+type ModelAttempt = { provider: ModelProvider; model: string; outcome: "succeeded" | "fallback" | "failed"; requestAttempted: boolean; deliveryState?: "attempted_unknown" | "provider_responded"; usageStatus?: "reported" | "unavailable"; usage?: { totalTokens?: number } | null; errorCode?: string | null; upstreamStatus?: number | null; requestId?: string | null; durationMs?: number };
+type ModelRun = { provider?: ModelProvider; model?: string; providerRequestId?: string | null; durationMs?: number; fallbackUsed?: boolean; usageCompleteness?: "complete" | "partial"; attempts?: ModelAttempt[]; usage?: { totalTokens?: number } };
+type ModelFailure = { code?: string; completedAt?: string; attempts?: ModelAttempt[] };
+type Step = { id: string; stepKey: string; sequence: number; attempt: number; status: string; receipt?: { modelRun?: ModelRun; modelFailure?: ModelFailure } };
 type RunBundle = {
   run: { id: string; status: string; currentSequence: number; input: Record<string, unknown>; output?: { artifactId?: string; qualityDecision?: string }; error?: { code?: string; message?: string } };
   steps: Step[];
@@ -40,6 +44,41 @@ const stageLabels: Record<string, string> = {
 const decisionLabels: Record<string, string> = { ai_first: "AI 优先处理", assistive_ai: "AI 辅助、人判断", do_not_use_ai: "不应交给 AI" };
 const runLabels: Record<string, string> = { provisioning: "正在建立", queued: "等待继续", running: "运行中", awaiting_approval: "等待你确认", succeeded: "已完成", partial_failed: "草稿需修订", failed: "失败可重试", cancelled: "已取消", blocked: "已阻断" };
 const stepLabels: Record<string, string> = { queued: "等待执行", running: "执行中", awaiting_approval: "等待确认", succeeded: "已完成", partial_failed: "需修订", failed: "失败", cancelled: "已取消", blocked: "已失效" };
+const providerLabels: Record<string, string> = { openai: "OpenAI", deepseek: "DeepSeek", anthropic: "Claude" };
+
+function modelReceiptLabel(step: Step): string {
+  const run = step.receipt?.modelRun;
+  if (!run?.model) return "";
+  const provider = run.provider ? providerLabels[run.provider] || run.provider : "外部模型";
+  return ` · ${provider} / ${run.model}${run.fallbackUsed ? " · 已透明降级" : ""}`;
+}
+
+function knownStepTokens(step: Step): number {
+  const modelRunTokens = step.receipt?.modelRun?.usage?.totalTokens;
+  if (typeof modelRunTokens === "number") return modelRunTokens;
+  return (step.receipt?.modelFailure?.attempts || []).reduce((sum, attempt) => (
+    attempt.usageStatus === "reported" ? sum + Number(attempt.usage?.totalTokens || 0) : sum
+  ), 0);
+}
+
+function ModelReceiptDetails({ step }: { step: Step }) {
+  const run = step.receipt?.modelRun;
+  const failure = step.receipt?.modelFailure;
+  const attempts = run?.attempts || failure?.attempts || [];
+  if (!run?.model && !attempts.length) return null;
+  return <details className="model-receipt-details">
+    <summary>{failure ? "模型失败回执" : "模型处理回执"} · {attempts.filter((item) => item.requestAttempted).length || 1} 次请求尝试</summary>
+    {run?.model && <p><span>实际完成</span><strong>{run.provider ? providerLabels[run.provider] : "外部模型"} / {run.model}</strong></p>}
+    {run?.model && <p><span>已确认用量与耗时</span><strong>{Number(run.usage?.totalTokens || 0).toLocaleString()} tokens · {Number(run.durationMs || 0).toLocaleString()} ms</strong></p>}
+    {failure?.code && <p><span>平台判定</span><strong>{failure.code}</strong></p>}
+    {attempts.map((attempt, index) => <p key={`${attempt.provider}-${index}`}>
+      <span>{index + 1}. {providerLabels[attempt.provider] || attempt.provider}</span>
+      <strong>{attempt.outcome === "succeeded" ? "成功" : attempt.outcome === "fallback" ? "瞬时失败，转备用模型" : "失败"}{attempt.upstreamStatus ? ` · HTTP ${attempt.upstreamStatus}` : ""}{attempt.deliveryState === "attempted_unknown" ? " · 是否送达未知" : ""}{attempt.usageStatus === "unavailable" ? " · 用量未知" : attempt.usage ? ` · ${Number(attempt.usage.totalTokens || 0).toLocaleString()} tokens 已确认` : ""}</strong>
+      {attempt.requestId && <code>{attempt.requestId}</code>}
+    </p>)}
+    {(run?.fallbackUsed || run?.usageCompleteness === "partial" || attempts.some((item) => item.usageStatus === "unavailable")) && <em>超时或连接失败时，主模型是否已收到材料、是否产生费用可能无法确认；当前 Token 合计只包含提供商已返回的用量。</em>}
+  </details>;
+}
 
 export default function InterviewRunner({ workflowVersionId, initialRunId, onBack }: {
   workflowVersionId?: string | null;
@@ -123,7 +162,7 @@ export default function InterviewRunner({ workflowVersionId, initialRunId, onBac
   const currentApproval = bundle?.approvals.find((item) => item.status === "pending") || null;
   const outputArtifact = bundle?.artifacts.find((item) => item.status === "ready" && item.metadata?.purpose === "prd_result");
   const quality = bundle?.data?.quality_report?.quality;
-  const tokenTotal = useMemo(() => bundle?.steps.reduce((sum, step) => sum + Number(step.receipt?.modelRun?.usage?.totalTokens || 0), 0) || 0, [bundle]);
+  const tokenTotal = useMemo(() => bundle?.steps.reduce((sum, step) => sum + knownStepTokens(step), 0) || 0, [bundle]);
 
   async function readFile(file?: File) {
     if (!file) return;
@@ -253,7 +292,7 @@ export default function InterviewRunner({ workflowVersionId, initialRunId, onBac
       </section>
       <section className="runner-results"><div className="runner-empty"><span>⌁</span><strong>官方“访谈到 PRD”固定 Pack</strong><p>你选择的入口 Skill 会明确展开为上方七个受控阶段；本 Gate 不会把任意 Skill 选择偷换成隐藏流水线。系统还会冻结七个 Release、材料摘要、跨境披露与无副作用策略。</p></div></section>
     </div> : <div className="runner-live-layout">
-      <aside className="runner-timeline"><div><small>RUN</small><strong>{bundle.run.id.slice(0, 22)}…</strong><span className={`run-state ${bundle.run.status}`}>{runLabels[bundle.run.status] || "未知状态"}</span></div>{bundle.steps.map((step) => <article key={`${step.id}-${step.attempt}`} className={step.status}><span>{String(step.sequence + 1).padStart(2, "0")}</span><div><strong>{stageLabels[step.stepKey] || "未知节点"}</strong><small>{stepLabels[step.status] || "未知状态"} · 第 {step.attempt} 次尝试{step.receipt?.modelRun?.model ? ` · ${step.receipt.modelRun.model}` : ""}</small></div></article>)}<p>{tokenTotal.toLocaleString()} tokens · 状态来自 D1，不用定时器伪造</p>{["queued", "running"].includes(bundle.run.status) && <button onClick={() => void resumeCurrent()} disabled={Boolean(busy)}>{bundle.run.status === "running" ? "刷新或恢复中断" : "继续执行"}</button>}{!["succeeded", "cancelled"].includes(bundle.run.status) && <button onClick={() => void cancelRun()} disabled={Boolean(busy)}>取消运行</button>}</aside>
+      <aside className="runner-timeline"><div><small>RUN</small><strong>{bundle.run.id.slice(0, 22)}…</strong><span className={`run-state ${bundle.run.status}`}>{runLabels[bundle.run.status] || "未知状态"}</span></div>{bundle.steps.map((step) => <article key={`${step.id}-${step.attempt}`} className={step.status}><span>{String(step.sequence + 1).padStart(2, "0")}</span><div><strong>{stageLabels[step.stepKey] || "未知节点"}</strong><small>{stepLabels[step.status] || "未知状态"} · 第 {step.attempt} 次尝试{modelReceiptLabel(step)}</small><ModelReceiptDetails step={step} /></div></article>)}<p>{tokenTotal.toLocaleString()} tokens · 状态来自 D1，不用定时器伪造</p>{["queued", "running"].includes(bundle.run.status) && <button onClick={() => void resumeCurrent()} disabled={Boolean(busy)}>{bundle.run.status === "running" ? "刷新或恢复中断" : "继续执行"}</button>}{!["succeeded", "cancelled"].includes(bundle.run.status) && <button onClick={() => void cancelRun()} disabled={Boolean(busy)}>取消运行</button>}</aside>
       <section className="runner-results">
         {bundle.run.status === "provisioning" && <div className="runner-error"><strong>任务建立过程被中断</strong><p>该状态不能继续执行。请取消这条记录后，从已保存工作流重新上传材料；已经提交的私有副本不会被当作成功结果。</p><button onClick={() => void cancelRun()} disabled={Boolean(busy)}>取消并释放运行名额</button></div>}
         {busy === "advancing" && <div className="runner-progress"><span className="live-dot" /><strong>正在执行并提交当前节点</strong><p>每次只认领一个节点；成功回执落库后才进入下一步。</p></div>}

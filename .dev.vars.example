@@ -1,0 +1,14 @@
+# Copy this file to .dev.vars for local development only. Never commit real keys.
+OPENAI_API_KEY=
+OPENAI_MODEL=
+DEEPSEEK_API_KEY=
+DEEPSEEK_MODEL=
+ANTHROPIC_API_KEY=
+ANTHROPIC_MODEL=
+
+# Comma-separated provider order: openai,deepseek,anthropic
+# A fallback is attempted only for transient connection/timeout/429/5xx failures.
+SKILLFLOW_MODEL_ROUTE_DEFAULT=
+SKILLFLOW_MODEL_ROUTE_DIAGNOSIS=
+SKILLFLOW_MODEL_ROUTE_COMPOSITION=
+SKILLFLOW_MODEL_ROUTE_RUNTIME=

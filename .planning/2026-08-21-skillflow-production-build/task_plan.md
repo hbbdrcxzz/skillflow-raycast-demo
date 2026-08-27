@@ -4,7 +4,7 @@
 Build a China-first, production-capable Skill marketplace and workbench for internet product and operations users. The acceptance bar is no longer a visual prototype: users must be able to discover real upstream Skills, inspect evidence and install handoffs, place Skills into a diagnosed workflow, run an allowlisted golden workflow against real user material, approve intermediate results, and download a real artifact.
 
 ## Current Phase
-Gate D — one genuine sandbox loop; user approved implementation on 2026-08-25 after Gate C was privately deployed as Sites version 7
+Gate D — provider-neutral sandbox runtime is code-complete and independently audited; private publication is authorized, while live-provider acceptance remains gated on server-side production Secrets
 
 ## Phases
 
@@ -89,12 +89,15 @@ Gate D — one genuine sandbox loop; user approved implementation on 2026-08-25 
 | Sites capability references were first resolved from the plugin `skills/references` directory | Used the filesystem-discovered `skills/sites-building/references` paths and continued; no product files were affected |
 | First Gate D lint pass found six unused/effect-state errors | Removed unused imports and eliminated synchronous effect state writes; rerun required |
 | A combined delete-and-add patch for `InterviewRunner.tsx` was rejected by `apply_patch` | Deleted and re-added the file in two safe patch operations |
+| First multi-model lint pass found an unused `emptyUsage` helper | Removed the unused helper; no runtime behavior depended on it |
+| Multi-model local smoke expected the legacy generic 502 for a mocked upstream 400 | Updated the smoke to the new non-fallbackable configuration-error contract (503); canary redaction behavior was unchanged |
+| First multi-model Red Team rerun was interrupted by the sub-agent account usage limit | Preserved the hard-gate policy and dispatched a fresh independent read-only Red Team instead of treating test success as audit success |
 
 ## Audit-Driven Delivery Gates (2026-08-22)
 1. **Gate A — honest Chinese marketplace (complete, user approved):** Registry identity routing, canonical/Chinese presentation separation, truthful states, blocked-Skill enforcement, responsive typography and private Sites version 5 all passed Red Team review.
 2. **Gate B — AI work discovery (complete, user approved, privately deployed as Sites version 6):** free-form conversation, adaptive clarification, editable and traceable Task Contract, explicit confirmation, and abstract work nodes generated only from the confirmed contract. Final independent Red Team review passed B1–B8 with no P0/P1 blockers; lint, production build, full 39/39 tests and 390/1440 real-browser checks passed.
 3. **Gate C — editable Skill composition (complete, user approved, privately deployed as Sites version 7):** confirmed Gate B handoff or Registry single-Skill entry, node-level execution mode, authoritative Release pins, task-fit recommendations, zero/one/ordered-multiple Skill composition, permission review, semantic Diff and immutable session-only WorkflowRevision. Final independent Red Team review passed C1–C8 with no P0/P1 blockers; production build, full 60/60 tests, lint/diff-check and 390/720/1024/1440 real-browser checks passed.
-4. **Gate D — one genuine sandbox loop (code/local contract complete; independent PASS; user checkpoint pending):** preflight, allowlisted seven-stage run, editable/versioned approval, partial-failure handling, real Artifact/quality receipt, persistence, retry/cancel and reopen from Command Home. Local contract-model verification passes; hosted real-model acceptance remains a deployment dependency.
+4. **Gate D — one genuine sandbox loop (Sites version 8 deployed; multi-model extension publication authorized):** preflight, allowlisted seven-stage run, editable/versioned approval, partial-failure handling, real Artifact/quality receipt, persistence, retry/cancel and reopen from Command Home. The provider-neutral OpenAI, DeepSeek and Anthropic extension passed 80/80 tests, lint, production build, extended D1/R2 smoke and independent Red Team review with P0=0/P1=0. Hosted live-provider acceptance still requires real server-side Secrets and one successful canary per provider claimed active.
 5. **Gate E — creator foundation:** submit/import/create draft, source/license/safety review, E1/E2 evaluation, immutable release and claim; analytics and one-time paid distribution remain post-traffic work.
 
 ## Gate B Acceptance Contract (Red Team hard gates)
@@ -140,6 +143,14 @@ Gate D — one genuine sandbox loop; user approved implementation on 2026-08-25 
 - The built-in interview-to-PRD runtime is the first execution adapter; the architecture must permit later allowlisted adapters without claiming they are already executable.
 - Anonymous/sample exploration may remain session-only, but private material, saving and real runs require authenticated Personal Workspace identity.
 - D1 is authoritative for workflow/run/approval/receipt metadata; R2 stores uploaded copies and Artifact bodies where appropriate. Browser storage is not evidence of persistence.
+
+### Gate D Multi-Model Extension (2026-08-26)
+- One server-only gateway must expose a provider-neutral structured-response contract to all Gate B/D business code; provider-specific authentication, URL, request/response shape and errors stay inside adapters.
+- MVP providers are OpenAI Responses API, DeepSeek Responses API and Anthropic Messages API. No browser-visible API keys, arbitrary user-supplied base URLs or silent provider switching.
+- Routing is explicit and auditable: a server policy selects a configured provider/model by task class and allowed fallback order; every receipt records the actual provider, model, upstream request ID, usage, duration and fallback reason.
+- A fallback may occur only for bounded transient/unavailable failures and must never hide invalid structured output, policy rejection, authentication/configuration failure or user cancellation. The final UI must disclose which provider actually processed the data.
+- Provider configuration is validated without exposing secret values. A missing provider fails honestly and does not make the product claim multi-model readiness.
+- Acceptance requires official-contract fixtures for all three providers, provider-specific error/redaction tests, fallback and no-fallback tests, full existing Gate B/D regression, production build, independent Red Team PASS and at least one hosted real-provider run for every provider claimed active.
 
 ### Gate D Schema and API Plan (frozen before code changes)
 - `workflow_versions` stores separate immutable Gate C composition and compiled runtime-plan snapshots plus adapter ID/version/digest; node Skill order and full Release Pins remain inside the validated snapshot for this Gate.

@@ -17,6 +17,7 @@ import type {
 } from "@/runtime/skills";
 import { contentDigest } from "./gate-c-release-resolver";
 import { GateDContractError } from "./gate-d-contracts";
+import { ModelGatewayError } from "./openai-responses";
 import {
   and,
   approvals,
@@ -60,7 +61,63 @@ function safeRuntimeError(error: unknown) {
   return {
     code: typeof value?.code === "string" ? value.code : "STEP_FAILED",
     message: typeof value?.message === "string" ? value.message.slice(0, 600) : "运行步骤失败",
-    retryable: !["INVALID_INPUT", "MODEL_OUTPUT_INVALID"].includes(String(value?.code || "")),
+    retryable: ![
+      "INVALID_INPUT", "MODEL_OUTPUT_INVALID", "MODEL_CONFIGURATION_ERROR",
+      "MODEL_POLICY_REJECTED", "MODEL_CANCELLED", "RUN_CANCELLED",
+    ].includes(String(value?.code || "")),
+  };
+}
+
+function safeModelFailureReceipt(error: unknown): JsonRecord | null {
+  if (!(error instanceof ModelGatewayError) || !error.details?.attempts?.length) return null;
+  return {
+    modelFailure: {
+      code: error.code,
+      completedAt: new Date().toISOString(),
+      attempts: error.details.attempts.map((attempt) => ({
+        provider: attempt.provider,
+        model: attempt.model,
+        outcome: attempt.outcome,
+        requestAttempted: attempt.requestAttempted,
+        deliveryState: attempt.deliveryState,
+        usageStatus: attempt.usageStatus,
+        usage: attempt.usage,
+        errorCode: attempt.errorCode,
+        upstreamStatus: attempt.upstreamStatus,
+        requestId: attempt.requestId,
+        durationMs: attempt.durationMs,
+      })),
+    },
+    ...(error.details.modelRun ? { modelRun: error.details.modelRun } : {}),
+  };
+}
+
+function knownFailureUsage(failureReceipt: JsonRecord | null) {
+  const modelRunUsage = asRecord(asRecord(failureReceipt?.modelRun).usage);
+  if (Object.keys(modelRunUsage).length) return modelRunUsage;
+  const attempts = asRecord(failureReceipt?.modelFailure).attempts;
+  if (!Array.isArray(attempts)) return {};
+  return attempts.reduce<JsonRecord>((sum, attempt) => {
+    const usage = asRecord(asRecord(attempt).usage);
+    return {
+      inputTokens: Number(sum.inputTokens || 0) + Number(usage.inputTokens || 0),
+      outputTokens: Number(sum.outputTokens || 0) + Number(usage.outputTokens || 0),
+      totalTokens: Number(sum.totalTokens || 0) + Number(usage.totalTokens || 0),
+    };
+  }, {});
+}
+
+function knownFailureModel(failureReceipt: JsonRecord | null) {
+  const modelRun = asRecord(failureReceipt?.modelRun);
+  if (typeof modelRun.provider === "string" && typeof modelRun.model === "string") {
+    return { provider: modelRun.provider, model: modelRun.model };
+  }
+  const attempts = asRecord(failureReceipt?.modelFailure).attempts;
+  if (!Array.isArray(attempts)) return { provider: null, model: null };
+  const reported = attempts.map(asRecord).find((attempt) => attempt.usageStatus === "reported");
+  return {
+    provider: typeof reported?.provider === "string" ? reported.provider : null,
+    model: typeof reported?.model === "string" ? reported.model : null,
   };
 }
 
@@ -488,6 +545,12 @@ export async function advanceInterviewRun(workspace: GateDWorkspace, runId: stri
       "interview_source_copy", "normalized_interview", "extracted_evidence", "clustered_insights",
       "workflow_assessment", "approved_analysis", "prd_draft",
     ]);
+    const modelOptions = {
+      cancellation: {
+        check: async () => { await ensureNotCancelled(workspace.workspaceId, runId, leaseToken); },
+        pollIntervalMs: 750,
+      },
+    };
     let output: unknown;
     let receipt: JsonRecord;
     let purpose: string;
@@ -503,23 +566,23 @@ export async function advanceInterviewRun(workspace: GateDWorkspace, runId: stri
       output = result.output; receipt = result.receipt as unknown as JsonRecord; purpose = "normalized_interview"; name = "标准化访谈.json";
     } else if (stepKey === "extract_evidence") {
       const normalized = parseJson<ReturnType<typeof runNormalizeInterviewStep>["output"]>(prior.normalized_interview.body, "标准化材料");
-      const result = await runExtractEvidenceStep({ researchGoal: String(inputMeta.researchGoal || ""), normalized });
+      const result = await runExtractEvidenceStep({ researchGoal: String(inputMeta.researchGoal || ""), normalized }, modelOptions);
       output = result.output; receipt = result.receipt as unknown as JsonRecord; purpose = "extracted_evidence"; name = "逐字证据.json";
     } else if (stepKey === "cluster_insights") {
       const evidence = parseJson<EvidenceExtractionOutput>(prior.extracted_evidence.body, "证据");
-      const result = await runClusterInsightsStep({ researchGoal: String(inputMeta.researchGoal || ""), evidence });
+      const result = await runClusterInsightsStep({ researchGoal: String(inputMeta.researchGoal || ""), evidence }, modelOptions);
       output = result.output; receipt = result.receipt as unknown as JsonRecord; purpose = "clustered_insights"; name = "洞察主题.json";
     } else if (stepKey === "assess_workflow_ai") {
       const evidence = parseJson<EvidenceExtractionOutput>(prior.extracted_evidence.body, "证据");
       const insights = parseJson<InsightClusteringOutput>(prior.clustered_insights.body, "洞察");
-      const result = await runAssessWorkflowStep({ researchGoal: String(inputMeta.researchGoal || ""), evidence, insights });
+      const result = await runAssessWorkflowStep({ researchGoal: String(inputMeta.researchGoal || ""), evidence, insights }, modelOptions);
       output = result.output; receipt = result.receipt as unknown as JsonRecord; purpose = "workflow_assessment"; name = "工作流 AI 判断.json";
     } else if (stepKey === "generate_prd") {
       const approved = parseJson<{ evidence: EvidenceExtractionOutput["evidence_items"]; approvedThemes: ApprovedTheme[]; workflowNodes: WorkflowAiAssessmentOutput["workflow_nodes"] }>(prior.approved_analysis.body, "已确认分析");
       const result = await runGeneratePrdStep({
         researchGoal: String(inputMeta.researchGoal || ""), productContext: String(inputMeta.productContext || ""),
         evidence: approved.evidence, approvedThemes: approved.approvedThemes, workflowNodes: approved.workflowNodes,
-      } satisfies PrdRuntimeInput);
+      } satisfies PrdRuntimeInput, modelOptions);
       output = result.output; receipt = result.receipt as unknown as JsonRecord; purpose = "prd_draft"; name = "PRD 草稿.json";
     } else {
       const prd = parseJson<PrdGenerationOutput>(prior.prd_draft.body, "PRD 草稿");
@@ -546,6 +609,20 @@ export async function advanceInterviewRun(workspace: GateDWorkspace, runId: stri
     if (qualityArtifact) committedArtifactIds.push(qualityArtifact.artifactId);
     const modelRun = asRecord(receipt.modelRun);
     const usage = asRecord(modelRun.usage);
+    const actualModelProvider = typeof modelRun.provider === "string" && modelRun.provider ? modelRun.provider : null;
+    const actualModelId = typeof modelRun.model === "string" && modelRun.model ? modelRun.model : null;
+    const modelSummary = actualModelProvider && actualModelId ? {
+      modelProvider: sql<string>`case
+        when ${runs.modelProvider} is null then ${actualModelProvider}
+        when ${runs.modelProvider} = ${actualModelProvider} then ${runs.modelProvider}
+        else 'mixed'
+      end`,
+      modelId: sql<string>`case
+        when ${runs.modelId} is null then ${actualModelId}
+        when ${runs.modelId} = ${actualModelId} then ${runs.modelId}
+        else 'mixed'
+      end`,
+    } : {};
     const completedAt = new Date().toISOString();
     const qualityDecision = purpose === "prd_result" ? String(asRecord(asRecord(output).quality).decision || "blocked") : null;
     const nextStatus = purpose === "prd_result" ? (qualityDecision === "pass_with_notes" ? "succeeded" : "partial_failed") : "queued";
@@ -567,6 +644,7 @@ export async function advanceInterviewRun(workspace: GateDWorkspace, runId: stri
       output: purpose === "prd_result" ? { artifactId: artifact.artifactId, qualityArtifactId: qualityArtifact?.artifactId || null, qualityDecision, outputDigest } : run.output,
       tokenInput: sql`${runs.tokenInput} + ${Number(usage.inputTokens || 0)}`,
       tokenOutput: sql`${runs.tokenOutput} + ${Number(usage.outputTokens || 0)}`,
+      ...modelSummary,
       leaseToken: null, leaseExpiresAt: null, updatedAt: completedAt,
       completedAt: purpose === "prd_result" ? completedAt : null,
       stateVersion: sql`${runs.stateVersion} + 1`,
@@ -595,6 +673,23 @@ export async function advanceInterviewRun(workspace: GateDWorkspace, runId: stri
     if (durableCommitted) throw error;
     for (const artifactId of committedArtifactIds) await discardArtifact(workspace.workspaceId, artifactId);
     const failure = safeRuntimeError(error);
+    const failureReceipt = safeModelFailureReceipt(error);
+    const failedUsage = knownFailureUsage(failureReceipt);
+    const failedModel = knownFailureModel(failureReceipt);
+    const failedModelProvider = failedModel.provider;
+    const failedModelId = failedModel.model;
+    const failedModelSummary = failedModelProvider && failedModelId ? {
+      modelProvider: sql<string>`case
+        when ${runs.modelProvider} is null then ${failedModelProvider}
+        when ${runs.modelProvider} = ${failedModelProvider} then ${runs.modelProvider}
+        else 'mixed'
+      end`,
+      modelId: sql<string>`case
+        when ${runs.modelId} is null then ${failedModelId}
+        when ${runs.modelId} = ${failedModelId} then ${runs.modelId}
+        else 'mixed'
+      end`,
+    } : {};
     const failedAt = new Date().toISOString();
     const current = await currentRun(workspace.workspaceId, runId);
     if (current.status !== "cancelled") {
@@ -602,10 +697,13 @@ export async function advanceInterviewRun(workspace: GateDWorkspace, runId: stri
       const failureRunHeld = sql`exists (select 1 from ${runs} where ${runs.id} = ${runId} and ${runs.workspaceId} = ${workspace.workspaceId} and ${runs.leaseToken} = ${leaseToken} and ${runs.status} = 'running')`;
       const failureStepCommitted = sql`exists (select 1 from ${runSteps} where ${runSteps.id} = ${step.id} and ${runSteps.leaseToken} = ${leaseToken} and ${runSteps.status} = 'failed')`;
       await db.batch([
-        db.update(runSteps).set({ status: "failed", error: failure, completedAt: failedAt, updatedAt: failedAt })
+        db.update(runSteps).set({ status: "failed", error: failure, receipt: failureReceipt, completedAt: failedAt, updatedAt: failedAt })
           .where(and(eq(runSteps.id, step.id), eq(runSteps.leaseToken, leaseToken), failureRunHeld)),
         db.update(runs).set({
           status: failureStatus, error: failure,
+          tokenInput: sql`${runs.tokenInput} + ${Number(failedUsage.inputTokens || 0)}`,
+          tokenOutput: sql`${runs.tokenOutput} + ${Number(failedUsage.outputTokens || 0)}`,
+          ...failedModelSummary,
           leaseToken: null, leaseExpiresAt: null, updatedAt: failedAt,
           stateVersion: sql`${runs.stateVersion} + 1`,
         }).where(and(
